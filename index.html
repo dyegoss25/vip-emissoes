@@ -470,7 +470,7 @@ tbody tr:hover { background: var(--surface2); }
     <div style="padding:12px 24px;border-top:1px solid var(--border);margin-top:auto;">
       <div id="sync-status" style="font-size:0.72rem;color:#888;margin-bottom:10px;display:flex;align-items:center;gap:5px;">⏳ <span>Carregando...</span></div>
       <button class="btn-ghost" style="width:100%;font-size:0.75rem;" onclick="syncManual()">↺ Sincronizar</button>
-      <button class="btn-ghost" style="width:100%;font-size:0.75rem;margin-top:6px;" onclick="abrirAuthModal()">🔑 Configurar Acesso</button>
+
     </div>
     <div class="sidebar-bottom" style="border-top:none;padding-top:0;">2026 · VIP Universal Tour</div>
   </aside>
@@ -936,90 +936,19 @@ tbody tr:hover { background: var(--surface2); }
 
 <div class="toast" id="toast"></div>
 
-<!-- MODAL AUTH -->
-<div class="modal-overlay" id="auth-modal">
-  <div class="modal" style="max-width:440px;">
-    <div class="modal-title">🔑 Configurar Acesso Google Sheets</div>
-    <p style="color:var(--text-2);font-size:0.8rem;margin:10px 0 16px;">Para sincronizar com o Google Sheets, cole aqui seu token de acesso OAuth. Você pode obtê-lo em <a href="https://developers.google.com/oauthplayground" target="_blank" style="color:var(--accent)">OAuth Playground</a> autorizando o escopo <code style="background:var(--surface2);padding:2px 5px;border-radius:3px;font-size:0.72rem;">https://www.googleapis.com/auth/spreadsheets</code></p>
-    <div class="form-group">
-      <label class="form-label">Access Token</label>
-      <input class="form-input" id="input-token" placeholder="ya29.a0AfH6SM..." style="font-family:'DM Mono',monospace;font-size:0.72rem;" />
-    </div>
-    <div class="modal-actions">
-      <button class="btn-ghost" onclick="document.getElementById('auth-modal').classList.remove('open')">Cancelar</button>
-      <button class="btn" onclick="salvarToken()">✓ Conectar</button>
-    </div>
-  </div>
-</div>
+
 
 <script>
 // ---- CONFIG ----
-const SHEET_ID = '1ZvuMk7zdN0csGH-txxKZ8sPKDJai_vJmk0Sb7hy5Mxg';
-const SHEET_NAME = 'Emissões';
-const SHEET_BACKUP_KEY = 'vip_emissoes_backup';
-const HEADERS = ['ID','Localizador','Cia','Passageiro','Qtd','Origem','Destino','Emissão','TipoVoo','DataIda','DataVolta','DataVoo','Plataforma','UsuarioMilhas','CustoEmissao','ValorTotal','ValorSite','Economia','Incentivo','InventivoManual','QuemReserva','StatusReserva','QuemIncentivo','StatusIncentivo','DriveLink','DriveFileName','Obs'];
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPAuWkBILsE5R_ZzEmKUZMXzHCwOgSc6QygMEaC4dnw6bAUWme7kX5lB_WpK5wZb39/exec';
+const BACKUP_KEY = 'vip_emissoes_backup';
+const HEADERS = ['ID','Localizador','Cia','Passageiro','Qtd','Origem','Destino','Emissao','TipoVoo','DataIda','DataVolta','DataVoo','Plataforma','UsuarioMilhas','CustoEmissao','ValorTotal','ValorSite','Economia','Incentivo','IncentivoManual','QuemReserva','StatusReserva','QuemIncentivo','StatusIncentivo','DriveLink','DriveFileName','Obs'];
 
-let emissoes = JSON.parse(localStorage.getItem(SHEET_BACKUP_KEY) || '[]');
+let emissoes = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
 let editingId = null;
-let sheetsToken = null;
-let sheetInitialized = false;
 
-// Backup local sempre que salvar
 function saveBackup() {
-  localStorage.setItem(SHEET_BACKUP_KEY, JSON.stringify(emissoes));
-}
-
-// ---- GOOGLE SHEETS API ----
-async function getToken() {
-  // Tenta obter token via gapi se disponível
-  if (window.gapi && window.gapi.auth2) {
-    try {
-      const auth = window.gapi.auth2.getAuthInstance();
-      if (auth && auth.isSignedIn.get()) {
-        return auth.currentUser.get().getAuthResponse().access_token;
-      }
-    } catch(e) {}
-  }
-  return sheetsToken;
-}
-
-async function sheetsRequest(method, path, body) {
-  const token = await getToken();
-  if (!token) return null;
-  try {
-    const resp = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + path, {
-      method,
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined
-    });
-    if (!resp.ok) return null;
-    return await resp.json();
-  } catch { return null; }
-}
-
-async function initSheet() {
-  if (sheetInitialized) return true;
-  const token = await getToken();
-  if (!token) return false;
-  // Verificar se aba existe e tem cabeçalho
-  const data = await sheetsRequest('GET', '/values/' + encodeURIComponent(SHEET_NAME + '!A1:A1'));
-  if (!data) {
-    // Criar aba e cabeçalhos
-    await sheetsRequest('POST', ':batchUpdate', {
-      requests: [{ addSheet: { properties: { title: SHEET_NAME } } }]
-    });
-    await sheetsRequest('PUT', '/values/' + encodeURIComponent(SHEET_NAME + '!A1'), {
-      valueInputOption: 'RAW',
-      values: [HEADERS]
-    });
-  } else if (!data.values) {
-    await sheetsRequest('PUT', '/values/' + encodeURIComponent(SHEET_NAME + '!A1'), {
-      valueInputOption: 'RAW',
-      values: [HEADERS]
-    });
-  }
-  sheetInitialized = true;
-  return true;
+  localStorage.setItem(BACKUP_KEY, JSON.stringify(emissoes));
 }
 
 function emissaoToRow(e) {
@@ -1036,60 +965,53 @@ function emissaoToRow(e) {
   ];
 }
 
-async function appendToSheet(emissao) {
-  await initSheet();
-  return await sheetsRequest('POST', '/values/' + encodeURIComponent(SHEET_NAME) + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
-    values: [emissaoToRow(emissao)]
-  });
-}
-
-async function rewriteSheet() {
-  await initSheet();
-  const rows = [HEADERS, ...emissoes.slice().reverse().map(emissaoToRow)];
-  return await sheetsRequest('PUT', '/values/' + encodeURIComponent(SHEET_NAME + '!A1'), {
-    valueInputOption: 'RAW',
-    values: rows
-  });
-}
-
-async function loadFromSheet() {
-  const token = await getToken();
-  if (!token) return false;
-  await initSheet();
-  const data = await sheetsRequest('GET', '/values/' + encodeURIComponent(SHEET_NAME + '!A2:AA10000'));
-  if (!data || !data.values || data.values.length === 0) return false;
-  emissoes = data.values.map(r => ({
+function rowToEmissao(r) {
+  return {
     id: Number(r[0]) || Date.now(),
     loc: r[1] || '—', cia: r[2] || '', pax: r[3] || '', qtd: Number(r[4]) || 1,
     origem: r[5] || '', destino: r[6] || '', emissao: r[7] || '',
     tipoVoo: r[8] || 'ida', dataIda: r[9] || '', dataVolta: r[10] || '', datavoo: r[11] || '',
     plataforma: r[12] || '', usuarioMilhas: r[13] || '', custoMilhas: Number(r[14]) || 0,
     valor: Number(r[15]) || 0, valorSite: Number(r[16]) || 0, economia: Number(r[17]) || 0,
-    incentivoManual: r[19] !== '' && r[19] !== undefined ? Number(r[19]) : null,
+    incentivoManual: (r[19] !== '' && r[19] !== undefined && r[19] !== null) ? Number(r[19]) : null,
     quemReserva: r[20] || '', statusReserva: r[21] || 'Pendente',
     quemIncentivo: r[22] || '', statusIncentivo: r[23] || 'Pendente',
     driveLink: r[24] || '', driveFileName: r[25] || '', obs: r[26] || ''
-  })).sort((a,b) => b.id - a.id);
+  };
+}
+
+async function scriptRequest(body) {
+  try {
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    const text = await resp.text();
+    return JSON.parse(text);
+  } catch(e) { return null; }
+}
+
+async function appendToSheet(emissao) {
+  return await scriptRequest({ action: 'append', row: emissaoToRow(emissao) });
+}
+
+async function rewriteSheet() {
+  const rows = [HEADERS, ...emissoes.slice().reverse().map(emissaoToRow)];
+  return await scriptRequest({ action: 'set', rows });
+}
+
+async function loadFromSheet() {
+  const data = await scriptRequest({ action: 'get' });
+  if (!data || !data.ok || !data.data || data.data.length <= 1) return false;
+  const rows = data.data.slice(1); // pular cabeçalho
+  emissoes = rows.map(rowToEmissao).sort((a,b) => b.id - a.id);
   saveBackup();
   return true;
 }
 
 async function save() {
-  saveBackup(); // sempre salva local primeiro
-  const ok = await rewriteSheet();
-  return ok;
-}
-
-// ---- AUTH GOOGLE ----
-function setToken(token) {
-  sheetsToken = token;
-  window._driveToken = token;
-}
-
-async function tryAutoAuth() {
-  // Tentar pegar token do contexto Claude se disponível
-  if (window.__claudeToken) { setToken(window.__claudeToken); return true; }
-  return false;
+  saveBackup();
+  return await rewriteSheet();
 }
 
 // ---- NAV ----
@@ -1637,17 +1559,7 @@ async function syncManual() {
   }
 }
 
-// Input de token manual para autenticação
-function abrirAuthModal() {
-  document.getElementById('auth-modal').classList.add('open');
-}
-function salvarToken() {
-  const t = document.getElementById('input-token').value.trim();
-  if (!t) return;
-  setToken(t);
-  document.getElementById('auth-modal').classList.remove('open');
-  syncManual();
-}
+
 
 init();
 </script>
