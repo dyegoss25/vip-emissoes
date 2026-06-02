@@ -1031,6 +1031,27 @@ function showView(name) {
 function fmtBRL(v) {
   return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+function fmtData(d) {
+  if (!d) return '—';
+  // Se já estiver no formato DD/MM/AAAA, retorna como está
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d;
+  // Se estiver no formato AAAA-MM-DD (padrão HTML date input)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [y, m, dd] = d.split('-');
+    return dd + '/' + m + '/' + y;
+  }
+  return d;
+}
+
+function fmtDataVoo(dataIda, dataVolta, tipoVoo) {
+  if (!dataIda) return '—';
+  const ida = fmtData(dataIda);
+  if (tipoVoo === 'idavolta' && dataVolta) {
+    return ida + ' → ' + fmtData(dataVolta);
+  }
+  return ida;
+}
 function incentivo(e) { if (typeof e === 'object' && e !== null) { return e.incentivoManual !== null && e.incentivoManual !== undefined ? e.incentivoManual : Number(e.valor || 0) * 0.05; } return Number(e || 0) * 0.05; }
 
 function ciaClass(cia) {
@@ -1170,7 +1191,7 @@ async function salvarEmissao() {
   const tipoVoo = document.querySelector('input[name="tipo-voo"]:checked').value;
   const dataIda = document.getElementById('f-data-ida').value;
   const dataVolta = document.getElementById('f-data-volta').value;
-  const datavoo = tipoVoo === 'idavolta' ? dataIda + (dataVolta ? ' → ' + dataVolta : '') : dataIda;
+  const datavoo = fmtDataVoo(dataIda, dataVolta, tipoVoo);
 
   const emissao = {
     id: Date.now(),
@@ -1318,7 +1339,7 @@ function renderDashboard() {
       <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
       <td>${e.pax}${e.qtd > 1 ? ' <span style="color:var(--text-2);font-size:0.68rem">('+e.qtd+')</span>' : ''}</td>
       <td class="rota">${e.origem} → ${e.destino}</td>
-      <td style="color:var(--text-2);font-size:0.72rem">${e.datavoo || '—'}</td>
+      <td style="color:var(--text-2);font-size:0.72rem">${fmtDataVoo(e.dataIda, e.dataVolta, e.tipoVoo)}</td>
       <td class="valor">${fmtBRL(e.valor)}</td>
       <td class="incentivo-val">${fmtBRL(incentivo(e))}</td>
       <td>${tagStatus(e.statusReserva)}</td>
@@ -1349,7 +1370,7 @@ function renderTabela() {
       <td style="text-align:center">${e.qtd}</td>
       <td class="rota">${e.origem} → ${e.destino}</td>
       <td style="color:var(--text-2);font-size:0.72rem">${e.emissao || '—'}</td>
-      <td style="color:var(--text-2);font-size:0.72rem">${e.datavoo || '—'}</td>
+      <td style="color:var(--text-2);font-size:0.72rem">${fmtDataVoo(e.dataIda, e.dataVolta, e.tipoVoo)}</td>
       <td class="valor">${fmtBRL(e.valor)}</td>
       <td class="incentivo-val">${fmtBRL(incentivo(e))}</td>
       <td style="font-size:0.72rem;color:var(--text-2)">${e.quemReserva || '—'}</td>
@@ -1379,7 +1400,7 @@ function renderPendencias() {
       <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
       <td>${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</td>
       <td class="rota">${e.origem} → ${e.destino}</td>
-      <td style="color:var(--text-2);font-size:0.72rem">${e.datavoo || '—'}</td>
+      <td style="color:var(--text-2);font-size:0.72rem">${fmtDataVoo(e.dataIda, e.dataVolta, e.tipoVoo)}</td>
       <td class="valor" style="color:var(--warning)">${fmtBRL(e.valor)}</td>
       <td style="font-size:0.72rem">${e.quemReserva || '—'}</td>
       <td><button class="btn" style="padding:5px 12px;font-size:0.7rem" onclick="marcarPago(${e.id},'reserva')">Marcar Pago</button></td>
@@ -1468,7 +1489,7 @@ function salvarEdicao() {
   e.emissao = document.getElementById('m-emissao').value;
   e.dataIda = dataIda;
   e.dataVolta = dataVolta;
-  e.datavoo = dataIda + (dataVolta ? ' → ' + dataVolta : '');
+  e.datavoo = fmtDataVoo(dataIda, dataVolta, tipoVoo === 'idavolta' ? 'idavolta' : 'ida');
   e.plataforma = document.getElementById('m-plataforma').value;
   e.usuarioMilhas = document.getElementById('m-usuario-milhas').value.trim();
   e.custoMilhas = parseFloat(document.getElementById('m-custo').value) || 0;
