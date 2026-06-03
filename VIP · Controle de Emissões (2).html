@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIP · Controle de Emissões</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0E0F11;
+  --surface: #16181C;
+  --surface2: #1E2128;
+  --border: #2A2D35;
+  --accent: #C8F135;
+  --accent-dim: rgba(200,241,53,0.12);
+  --accent-dim2: rgba(200,241,53,0.06);
+  --text: #F0F0EE;
+  --text-2: #8A8D96;
+  --text-3: #4A4D56;
+  --danger: #FF5C5C;
+  --danger-dim: rgba(255,92,92,0.12);
+  --success: #4DFFB4;
+  --success-dim: rgba(77,255,180,0.1);
+  --warning: #FFB443;
+  --warning-dim: rgba(255,180,67,0.12);
+  --radius: 10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* LAYOUT */
+.app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 28px 0;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.logo {
+  padding: 0 24px 28px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.logo-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  line-height: 1.1;
+}
+.logo-sub { font-size: 0.65rem; color: var(--text-2); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 3px; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 24px;
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+.nav-item:hover { color: var(--text); background: var(--accent-dim2); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim2); }
+.nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-3);
+}
+
+/* MAIN */
+.main { padding: 32px 36px; overflow-y: auto; }
+
+/* VIEWS */
+.view { display: none; }
+.view.active { display: block; }
+
+/* PAGE HEADER */
+.page-header { margin-bottom: 28px; }
+.page-title { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.page-title span { color: var(--accent); }
+.page-desc { font-size: 0.8rem; color: var(--text-2); margin-top: 5px; }
+
+/* STATS ROW */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.stat-label { font-size: 0.68rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.stat-value { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 700; }
+.stat-value.accent { color: var(--accent); }
+.stat-value.danger { color: var(--danger); }
+.stat-value.success { color: var(--success); }
+.stat-value.warning { color: var(--warning); }
+.stat-sub { font-size: 0.7rem; color: var(--text-3); margin-top: 4px; }
+
+/* PENDENCIAS */
+.section-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.badge-count {
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 20px;
+  font-family: 'DM Mono', monospace;
+}
+
+.pendencias-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+
+.pend-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.pend-card-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pend-card-title { font-size: 0.78rem; font-weight: 600; }
+.pend-card-title.reserva { color: var(--warning); }
+.pend-card-title.incentivo { color: var(--danger); }
+
+.pend-list { max-height: 280px; overflow-y: auto; }
+.pend-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.1s;
+}
+.pend-item:hover { background: var(--surface2); }
+.pend-item:last-child { border-bottom: none; }
+.pend-info { flex: 1; min-width: 0; }
+.pend-pax { font-size: 0.78rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pend-rota { font-size: 0.68rem; color: var(--text-2); font-family: 'DM Mono', monospace; margin-top: 2px; }
+.pend-valor {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--warning);
+  white-space: nowrap;
+}
+.pend-valor.incentivo { color: var(--danger); }
+.pend-quem { font-size: 0.65rem; color: var(--text-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+
+.empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 0.78rem;
+}
+
+/* TABELA */
+.table-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.search-box {
+  flex: 1;
+  min-width: 180px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.search-box:focus { border-color: var(--accent); }
+.search-box::placeholder { color: var(--text-3); }
+
+.filter-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  cursor: pointer;
+}
+.filter-select:focus { border-color: var(--accent); }
+
+.btn {
+  background: var(--accent);
+  color: #0E0F11;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: 'Syne', sans-serif;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.btn:hover { opacity: 0.85; }
+.btn-ghost {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-ghost:hover { border-color: var(--text-2); color: var(--text); }
+
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
+thead tr { background: var(--surface2); }
+th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface2); }
+
+.loc { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--accent); }
+.rota { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text-2); }
+.valor { font-family: 'DM Mono', monospace; font-weight: 500; }
+.incentivo-val { font-family: 'DM Mono', monospace; color: var(--success); font-weight: 500; }
+
+.tag {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.tag-pago { background: var(--success-dim); color: var(--success); }
+.tag-pendente { background: var(--danger-dim); color: var(--danger); }
+.tag-ntem { background: var(--surface2); color: var(--text-3); }
+
+.cia-tag {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--surface2);
+  color: var(--text-2);
+}
+.cia-gol { background: #2A1F00; color: #FFB443; }
+.cia-azul { background: #001A2A; color: #5BB8F5; }
+.cia-latam { background: #1A0010; color: #FF6B9D; }
+
+.act-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.act-btn:hover { color: var(--accent); }
+
+/* FORMULÁRIO */
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  max-width: 760px;
+}
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.form-full { grid-column: 1 / -1; }
+
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.form-input, .form-select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+.form-input:focus, .form-select:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--text-3); }
+.form-select option { background: var(--surface2); }
+
+.incentivo-preview {
+  background: var(--accent-dim);
+  border: 1px solid rgba(200,241,53,0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.incentivo-preview-label { font-size: 0.72rem; color: var(--text-2); }
+.incentivo-preview-val {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.divider { height: 1px; background: var(--border); margin: 20px 0; grid-column: 1/-1; }
+
+.form-actions { display: flex; gap: 10px; margin-top: 24px; }
+
+/* MODAL */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  width: 90%;
+  max-width: 500px;
+}
+.modal-title { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+.btn-danger { background: var(--danger); color: #fff; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--accent);
+  color: #0E0F11;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 12px 20px;
+  border-radius: 8px;
+  z-index: 200;
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all 0.3s;
+  font-family: 'Syne', sans-serif;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; flex-direction: row; padding: 12px 16px; flex-wrap: wrap; }
+  .logo { padding: 0 16px 0 0; border-bottom: none; border-right: 1px solid var(--border); margin-bottom: 0; margin-right: 12px; }
+  .main { padding: 20px 16px; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .pendencias-grid { grid-template-columns: 1fr; }
+  .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-title">VIP Universal</div>
+      <div class="logo-sub">Controle de Emissões</div>
+    </div>
+    <nav>
+      <div class="nav-item active" onclick="showView('dashboard')">
+        <span class="nav-icon">◈</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="showView('lancamento')">
+        <span class="nav-icon">＋</span> Nova Emissão
+      </div>
+      <div class="nav-item" onclick="showView('emissoes')">
+        <span class="nav-icon">≡</span> Todas as Emissões
+      </div>
+      <div class="nav-item" onclick="showView('pendencias')">
+        <span class="nav-icon">⚑</span> Pendências
+      </div>
+    </nav>
+    <div style="padding:12px 24px;border-top:1px solid var(--border);margin-top:auto;">
+      <div id="sync-status" style="font-size:0.72rem;color:#888;margin-bottom:10px;display:flex;align-items:center;gap:5px;">⏳ <span>Carregando...</span></div>
+      <button class="btn-ghost" style="width:100%;font-size:0.75rem;" onclick="syncManual()">↺ Sincronizar</button>
+
+    </div>
+    <div class="sidebar-bottom" style="border-top:none;padding-top:0;">2026 · VIP Universal Tour</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div id="view-dashboard" class="view active">
+      <div class="page-header">
+        <div class="page-title">Dashboard <span>·</span> Visão Geral</div>
+        <div class="page-desc">Resumo de emissões e pendências financeiras</div>
+      </div>
+
+      <div class="stats-row" id="stats-row"></div>
+
+      <div class="pendencias-grid">
+        <div class="pend-card">
+          <div class="pend-card-header">
+            <span class="pend-card-title reserva">⚡ Reservas a Receber</span>
+            <span class="badge-count" id="badge-reserva">0</span>
+          </div>
+          <div class="pend-list" id="list-reserva"></div>
+        </div>
+        <div class="pend-card">
+          <div class="pend-card-header">
+            <span class="pend-card-title incentivo">↩ Incentivos a Pagar</span>
+            <span class="badge-count" id="badge-incentivo">0</span>
+          </div>
+          <div class="pend-list" id="list-incentivo"></div>
+        </div>
+      </div>
+
+      <div class="section-title">Últimas Emissões</div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Localizador</th>
+                <th>Cia</th>
+                <th>Passageiro / Grupo</th>
+                <th>Rota</th>
+                <th>Data Voo</th>
+                <th>Valor Total</th>
+                <th>Incentivo 5%</th>
+                <th>Reserva</th>
+                <th>Incentivo</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-recentes"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOVA EMISSÃO -->
+    <div id="view-lancamento" class="view">
+      <div class="page-header">
+        <div class="page-title">Nova <span>Emissão</span></div>
+        <div class="page-desc">Preencha os dados da passagem emitida</div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Localizador</label>
+            <input class="form-input" id="f-loc" placeholder="Ex: ABCDEF" style="font-family:'DM Mono',monospace;text-transform:uppercase;" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Companhia Aérea</label>
+            <select class="form-select" id="f-cia">
+              <option value="">Selecione...</option>
+              <option>GOL</option>
+              <option>Azul</option>
+              <option>LATAM</option>
+              <option>Avianca</option>
+              <option>Copa Airlines</option>
+              <option>TAP</option>
+              <option>Ryanair</option>
+              <option>Outro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Passageiro / Grupo</label>
+            <input class="form-input" id="f-pax" placeholder="Ex: Mario Paim ou Toque Dez" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Qtd. Passageiros</label>
+            <input class="form-input" id="f-qtd" type="number" min="1" value="1" placeholder="1" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Origem</label>
+            <input class="form-input" id="f-origem" placeholder="Ex: SSA" style="text-transform:uppercase;font-family:'DM Mono',monospace;" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Destino</label>
+            <input class="form-input" id="f-destino" placeholder="Ex: CGH" style="text-transform:uppercase;font-family:'DM Mono',monospace;" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Emissão</label>
+            <input class="form-input" id="f-emissao" type="date" />
+          </div>
+
+          <!-- TIPO DE VOO -->
+          <div class="form-group form-full">
+            <label class="form-label">Tipo de Voo</label>
+            <div style="display:flex;gap:10px;margin-top:2px;">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:0.82rem;color:var(--text-2);">
+                <input type="radio" name="tipo-voo" value="ida" id="tipo-ida" onchange="toggleTipoVoo()" checked
+                  style="accent-color:var(--accent);width:15px;height:15px;" />
+                Somente Ida
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:0.82rem;color:var(--text-2);">
+                <input type="radio" name="tipo-voo" value="idavolta" id="tipo-idavolta" onchange="toggleTipoVoo()"
+                  style="accent-color:var(--accent);width:15px;height:15px;" />
+                Ida e Volta
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data Ida</label>
+            <input class="form-input" id="f-data-ida" type="date" />
+          </div>
+          <div class="form-group" id="grupo-data-volta" style="display:none;">
+            <label class="form-label">Data Volta</label>
+            <input class="form-input" id="f-data-volta" type="date" />
+          </div>
+          <div class="form-group" id="grupo-data-volta-placeholder" style="display:block;visibility:hidden;">
+            <label class="form-label">&nbsp;</label>
+          </div>
+
+          <!-- PLATAFORMA -->
+          <div class="divider"></div>
+          <div class="form-group">
+            <label class="form-label">Plataforma de Emissão</label>
+            <select class="form-select" id="f-plataforma" onchange="togglePlataforma()">
+              <option value="">Selecione...</option>
+              <option value="Rextur">Rextur</option>
+              <option value="BRT">BRT</option>
+              <option value="Busca Ideal">Busca Ideal</option>
+              <option value="Milhas">Milhas</option>
+            </select>
+          </div>
+          <div class="form-group" id="grupo-usuario-milhas" style="display:none;">
+            <label class="form-label">Usuário das Milhas</label>
+            <input class="form-input" id="f-usuario-milhas" placeholder="Ex: Jehan, Mario Paim..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Custo de Emissão (R$)</label>
+            <input class="form-input" id="f-custo-milhas" type="number" step="0.01" placeholder="0,00" />
+          </div>
+
+          <!-- VALOR -->
+          <div class="form-group form-full">
+            <label class="form-label">Valor Total (R$)</label>
+            <input class="form-input" id="f-valor" type="number" step="0.01" placeholder="0,00" oninput="calcIncentivo()" />
+          </div>
+          <div class="form-full incentivo-preview" style="flex-direction:column;gap:10px;align-items:stretch;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="incentivo-preview-label">Incentivo a repassar (5% do valor de venda)</span>
+              <span class="incentivo-preview-val" id="incentivo-calc">R$ 0,00</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <label class="form-label" style="white-space:nowrap;margin:0;">Ajuste manual:</label>
+              <input class="form-input" id="f-incentivo-manual" type="number" step="0.01" placeholder="Deixe vazio para usar 5% automático"
+                style="flex:1;" oninput="calcIncentivo()" />
+            </div>
+          </div>
+          <!-- VALOR DO SITE E ECONOMIA -->
+          <div class="form-group">
+            <label class="form-label">Valor do Site (R$)</label>
+            <input class="form-input" id="f-valor-site" type="number" step="0.01" placeholder="0,00" oninput="calcEconomia()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Economia Gerada</label>
+            <div class="incentivo-preview" style="padding:10px 14px;">
+              <span class="incentivo-preview-label" style="font-size:0.72rem;">Valor site − Valor venda</span>
+              <span class="incentivo-preview-val" id="economia-calc" style="color:var(--success);">R$ 0,00</span>
+            </div>
+          </div>
+
+          <!-- ANEXO PDF -->
+          <div class="form-group form-full">
+            <label class="form-label">Anexar Reserva (PDF)</label>
+            <div id="upload-area" onclick="document.getElementById('f-pdf').click()"
+              style="border:1.5px dashed var(--border);border-radius:8px;padding:16px 20px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color 0.15s;"
+              onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
+              <span style="font-size:1.4rem;">📎</span>
+              <div>
+                <div id="upload-label" style="font-size:0.82rem;color:var(--text-2);">Clique para selecionar o PDF da reserva</div>
+                <div style="font-size:0.68rem;color:var(--text-3);margin-top:2px;">O arquivo será salvo no Google Drive na pasta do mês do voo</div>
+              </div>
+            </div>
+            <input type="file" id="f-pdf" accept="application/pdf" style="display:none;" onchange="onPdfSelected()" />
+          </div>
+          <div id="upload-status" style="display:none;" class="form-full">
+            <div style="background:var(--accent-dim);border:1px solid rgba(200,241,53,0.2);border-radius:8px;padding:10px 16px;font-size:0.78rem;display:flex;align-items:center;gap:10px;">
+              <span id="upload-icon">⏳</span>
+              <span id="upload-msg">Aguardando envio...</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+          <div class="form-group">
+            <label class="form-label">Quem Paga a Reserva</label>
+            <input class="form-input" id="f-quem-reserva" placeholder="Ex: Mario Paim, Ad Produção..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status Reserva</label>
+            <select class="form-select" id="f-status-reserva">
+              <option value="Pendente">Pendente</option>
+              <option value="Pago">Pago</option>
+              <option value="N/A">Não tem</option>
+            </select>
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Quem Recebe o Incentivo</label>
+            <div id="recebedores-list"></div>
+            <button type="button" class="btn-ghost" style="margin-top:8px;font-size:0.8rem;padding:6px 12px;" onclick="addRecebedor()">+ Adicionar recebedor</button>
+            <div class="incentivo-preview" style="margin-top:8px;padding:8px 14px;">
+              <span class="incentivo-preview-label" style="font-size:0.72rem;">Total distribuído aos recebedores</span>
+              <span class="incentivo-preview-val" id="recebedores-total" style="font-size:0.95rem;">R$ 0,00</span>
+            </div>
+            <input type="hidden" id="f-quem-incentivo" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status Incentivo</label>
+            <select class="form-select" id="f-status-incentivo">
+              <option value="Pendente">Pendente</option>
+              <option value="Pago">Pago</option>
+              <option value="N/A">Não tem</option>
+            </select>
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Observações</label>
+            <input class="form-input" id="f-obs" placeholder="Informações adicionais..." />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" onclick="salvarEmissao()">✓ Salvar Emissão</button>
+          <button class="btn-ghost" onclick="limparForm()">Limpar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TODAS EMISSÕES -->
+    <div id="view-emissoes" class="view">
+      <div class="page-header">
+        <div class="page-title">Todas as <span>Emissões</span></div>
+        <div class="page-desc">Histórico completo de passagens emitidas</div>
+      </div>
+      <div class="table-toolbar">
+        <input class="search-box" id="search-input" placeholder="Buscar por passageiro, localizador, rota..." oninput="renderTabela()" />
+        <select class="filter-select" id="filter-cia" onchange="renderTabela()">
+          <option value="">Todas as cias</option>
+          <option>GOL</option><option>Azul</option><option>LATAM</option>
+          <option>Avianca</option><option>Copa Airlines</option>
+        </select>
+        <select class="filter-select" id="filter-reserva" onchange="renderTabela()">
+          <option value="">Status reserva</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Pago">Pago</option>
+        </select>
+        <select class="filter-select" id="filter-incentivo" onchange="renderTabela()">
+          <option value="">Status incentivo</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Pago">Pago</option>
+        </select>
+        <button class="btn" onclick="showView('lancamento')">+ Nova</button>
+      </div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Localizador</th>
+                <th>Cia</th>
+                <th>Passageiro / Grupo</th>
+                <th>Pax</th>
+                <th>Rota</th>
+                <th>Emissão</th>
+                <th>Voo</th>
+                <th>Valor Total</th>
+                <th>Incentivo 5%</th>
+                <th>Quem Paga</th>
+                <th>Reserva</th>
+                <th>Recebe Incentivo</th>
+                <th>Incentivo</th>
+                <th>Obs</th>
+                <th>PDF</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbody-all"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PENDÊNCIAS -->
+    <div id="view-pendencias" class="view">
+      <div class="page-header">
+        <div class="page-title"><span>Pendências</span> Financeiras</div>
+        <div class="page-desc">Reservas a receber e incentivos a pagar</div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div class="section-title">
+          ⚡ Reservas a Receber
+          <span class="badge-count" id="badge-reserva2">0</span>
+        </div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Localizador</th><th>Cia</th><th>Passageiro</th><th>Rota</th><th>Data Voo</th><th>Valor Total</th><th>Quem Paga</th><th>Ação</th></tr>
+              </thead>
+              <tbody id="tbody-pend-reserva"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">
+          ↩ Incentivos a Pagar
+          <span class="badge-count" id="badge-incentivo2">0</span>
+        </div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Localizador</th><th>Cia</th><th>Passageiro</th><th>Rota</th><th>Incentivo 5%</th><th>Recebe</th><th>Ação</th></tr>
+              </thead>
+              <tbody id="tbody-pend-incentivo"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL EDIÇÃO COMPLETA -->
+<div class="modal-overlay" id="modal-overlay" style="overflow-y:auto;padding:20px 0;">
+  <div class="modal" style="max-width:680px;width:95%;max-height:90vh;overflow-y:auto;">
+    <div class="modal-title">✎ Editar Emissão</div>
+    <div class="form-grid" style="margin-top:8px;">
+      <div class="form-group">
+        <label class="form-label">Localizador</label>
+        <input class="form-input" id="m-loc" style="font-family:'DM Mono',monospace;text-transform:uppercase;" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Companhia Aérea</label>
+        <select class="form-select" id="m-cia">
+          <option value="">Selecione...</option>
+          <option>GOL</option><option>Azul</option><option>LATAM</option>
+          <option>Avianca</option><option>Copa Airlines</option><option>TAP</option>
+          <option>Ryanair</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passageiro / Grupo</label>
+        <input class="form-input" id="m-pax" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Qtd. Passageiros</label>
+        <input class="form-input" id="m-qtd" type="number" min="1" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Origem</label>
+        <input class="form-input" id="m-origem" style="text-transform:uppercase;font-family:'DM Mono',monospace;" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Destino</label>
+        <input class="form-input" id="m-destino" style="text-transform:uppercase;font-family:'DM Mono',monospace;" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data de Emissão</label>
+        <input class="form-input" id="m-emissao" type="date" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data Ida</label>
+        <input class="form-input" id="m-data-ida" type="date" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data Volta</label>
+        <input class="form-input" id="m-data-volta" type="date" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Plataforma</label>
+        <select class="form-select" id="m-plataforma" onchange="toggleMilhasModal()">
+          <option value="">Selecione...</option>
+          <option value="Rextur">Rextur</option>
+          <option value="BRT">BRT</option>
+          <option value="Busca Ideal">Busca Ideal</option>
+          <option value="Milhas">Milhas</option>
+        </select>
+      </div>
+      <div class="form-group" id="m-grupo-milhas" style="display:none;">
+        <label class="form-label">Usuário das Milhas</label>
+        <input class="form-input" id="m-usuario-milhas" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Custo de Emissão (R$)</label>
+        <input class="form-input" id="m-custo" type="number" step="0.01" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Valor Total (R$)</label>
+        <input class="form-input" id="m-valor" type="number" step="0.01" oninput="calcIncentivoModal()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Valor do Site (R$)</label>
+        <input class="form-input" id="m-valor-site" type="number" step="0.01" oninput="calcIncentivoModal()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Incentivo a Repassar (R$)</label>
+        <input class="form-input" id="m-incentivo" type="number" step="0.01" placeholder="Vazio = 5% automático" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Quem Paga a Reserva</label>
+        <input class="form-input" id="m-quem-reserva" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status Reserva</label>
+        <select class="form-select" id="m-status-reserva">
+          <option value="Pendente">Pendente</option>
+          <option value="Pago">Pago</option>
+          <option value="N/A">Não tem</option>
+        </select>
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">Quem Recebe Incentivo</label>
+        <div id="m-recebedores-list"></div>
+        <button type="button" class="btn-ghost" style="margin-top:8px;font-size:0.8rem;padding:6px 12px;" onclick="addRecebedorModal()">+ Adicionar recebedor</button>
+        <input type="hidden" id="m-quem-incentivo" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status Incentivo</label>
+        <select class="form-select" id="m-status-incentivo">
+          <option value="Pendente">Pendente</option>
+          <option value="Pago">Pago</option>
+          <option value="N/A">Não tem</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label class="form-label">Observações</label>
+        <input class="form-input" id="m-obs" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn" onclick="salvarEdicao()">✓ Salvar Alterações</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAR EXCLUSÃO -->
+<div class="modal-overlay" id="modal-excluir">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-title" style="color:var(--danger);">⚠ Excluir Emissão</div>
+    <p style="color:var(--text-2);font-size:0.85rem;margin-top:8px;">Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="document.getElementById('modal-excluir').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-danger" onclick="excluirEmissao()">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+
+<script>
+// ---- CONFIG ----
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPAuWkBILsE5R_ZzEmKUZMXzHCwOgSc6QygMEaC4dnw6bAUWme7kX5lB_WpK5wZb39/exec';
+const BACKUP_KEY = 'vip_emissoes_backup';
+const HEADERS = ['ID','Localizador','Cia','Passageiro','Qtd','Origem','Destino','Emissao','TipoVoo','DataIda','DataVolta','DataVoo','Plataforma','UsuarioMilhas','CustoEmissao','ValorTotal','ValorSite','Economia','Incentivo','IncentivoManual','QuemReserva','StatusReserva','QuemIncentivo','StatusIncentivo','DriveLink','DriveFileName','Obs'];
+
+let emissoes = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+let editingId = null;
+
+function saveBackup() {
+  localStorage.setItem(BACKUP_KEY, JSON.stringify(emissoes));
+}
+
+function emissaoToRow(e) {
+  return [
+    e.id, e.loc, e.cia, e.pax, e.qtd,
+    e.origem, e.destino, e.emissao, e.tipoVoo,
+    e.dataIda, e.dataVolta, e.datavoo,
+    e.plataforma, e.usuarioMilhas, e.custoMilhas,
+    e.valor, e.valorSite, e.economia,
+    incentivo(e), e.incentivoManual !== null && e.incentivoManual !== undefined ? e.incentivoManual : '',
+    e.quemReserva, e.statusReserva,
+    e.quemIncentivo, e.statusIncentivo,
+    e.driveLink, e.driveFileName, e.obs
+  ];
+}
+
+function rowToEmissao(r) {
+  return {
+    id: Number(r[0]) || Date.now(),
+    loc: r[1] || '—', cia: r[2] || '', pax: r[3] || '', qtd: Number(r[4]) || 1,
+    origem: r[5] || '', destino: r[6] || '', emissao: r[7] || '',
+    tipoVoo: r[8] || 'ida', dataIda: r[9] || '', dataVolta: r[10] || '', datavoo: r[11] || '',
+    plataforma: r[12] || '', usuarioMilhas: r[13] || '', custoMilhas: Number(r[14]) || 0,
+    valor: Number(r[15]) || 0, valorSite: Number(r[16]) || 0, economia: Number(r[17]) || 0,
+    incentivoManual: (r[19] !== '' && r[19] !== undefined && r[19] !== null) ? Number(r[19]) : null,
+    quemReserva: r[20] || '', statusReserva: r[21] || 'Pendente',
+    quemIncentivo: r[22] || '', statusIncentivo: r[23] || 'Pendente',
+    driveLink: r[24] || '', driveFileName: r[25] || '', obs: r[26] || ''
+  };
+}
+
+async function scriptRequest(body) {
+  try {
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    const text = await resp.text();
+    return JSON.parse(text);
+  } catch(e) { return null; }
+}
+
+async function appendToSheet(emissao) {
+  return await scriptRequest({ action: 'append', row: emissaoToRow(emissao) });
+}
+
+async function rewriteSheet() {
+  const rows = [HEADERS, ...emissoes.slice().reverse().map(emissaoToRow)];
+  return await scriptRequest({ action: 'set', rows });
+}
+
+async function loadFromSheet() {
+  const data = await scriptRequest({ action: 'get' });
+  if (!data || !data.ok || !data.data || data.data.length <= 1) return false;
+  const rows = data.data.slice(1); // pular cabeçalho
+  emissoes = rows.map(rowToEmissao).sort((a,b) => b.id - a.id);
+  saveBackup();
+  return true;
+}
+
+async function save() {
+  saveBackup();
+  return await rewriteSheet();
+}
+
+// ---- NAV ----
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  const navItems = document.querySelectorAll('.nav-item');
+  const map = { dashboard: 0, lancamento: 1, emissoes: 2, pendencias: 3 };
+  navItems[map[name]].classList.add('active');
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'emissoes') renderTabela();
+  if (name === 'pendencias') renderPendencias();
+}
+
+// ---- FORMAT ----
+function fmtBRL(v) {
+  return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtData(d) {
+  if (!d) return '—';
+  // Se já estiver no formato DD/MM/AAAA, retorna como está
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d;
+  // Se estiver no formato AAAA-MM-DD (padrão HTML date input)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [y, m, dd] = d.split('-');
+    return dd + '/' + m + '/' + y;
+  }
+  return d;
+}
+
+function fmtDataVoo(dataIda, dataVolta, tipoVoo) {
+  if (!dataIda) return '—';
+  const ida = fmtData(dataIda);
+  if (tipoVoo === 'idavolta' && dataVolta) {
+    return ida + ' → ' + fmtData(dataVolta);
+  }
+  return ida;
+}
+function incentivo(e) { if (typeof e === 'object' && e !== null) { return e.incentivoManual !== null && e.incentivoManual !== undefined ? e.incentivoManual : Number(e.valor || 0) * 0.05; } return Number(e || 0) * 0.05; }
+
+function ciaClass(cia) {
+  const c = (cia || '').toUpperCase();
+  if (c.includes('GOL')) return 'cia-gol';
+  if (c.includes('AZUL')) return 'cia-azul';
+  if (c.includes('LATAM')) return 'cia-latam';
+  return '';
+}
+
+function tagStatus(s) {
+  if (s === 'Pago') return '<span class="tag tag-pago">Pago</span>';
+  if (s === 'N/A') return '<span class="tag tag-ntem">N/A</span>';
+  return '<span class="tag tag-pendente">Pendente</span>';
+}
+
+// ---- CALC INCENTIVO ----
+function calcIncentivo() {
+  const val = parseFloat(document.getElementById('f-valor').value) || 0;
+  const manual = document.getElementById('f-incentivo-manual').value;
+  const inc = manual !== '' ? parseFloat(manual) || 0 : val * 0.05;
+  document.getElementById('incentivo-calc').textContent = fmtBRL(inc);
+  calcEconomia();
+}
+
+function calcEconomia() {
+  const site = parseFloat(document.getElementById('f-valor-site').value) || 0;
+  const venda = parseFloat(document.getElementById('f-valor').value) || 0;
+  const eco = site - venda;
+  const el = document.getElementById('economia-calc');
+  el.textContent = fmtBRL(eco);
+  el.style.color = eco >= 0 ? 'var(--success)' : 'var(--danger)';
+}
+
+function calcEconomiaVal() {
+  const site = parseFloat(document.getElementById('f-valor-site').value) || 0;
+  const venda = parseFloat(document.getElementById('f-valor').value) || 0;
+  return site - venda;
+}
+
+// Mapa de IDs das pastas do Drive por mês
+const DRIVE_FOLDERS = {
+  1: '1mJFJzKWpi1y-19bxFODxZt1SzQhHhapa',
+  2: '1HvJfV4eyfB3QMamPf7dKGYr34peXnSaQ',
+  3: '1z1unsfXitjaSd8nODVi96XXPH9oCpYu8',
+  4: '1Ob3V-ClY3TDCOvDOaehXttH0dRgVofUm',
+  5: '1AYZQDuYB_WG5N04H-1WhopfppDwYuCPu',
+  6: '1yxrOAGjiG3cRuYERjJp6FuYyf4CCcpZy',
+  7: '1EAvBIu75cf0dK1l6OnfpUq2muDLxIMQY',
+  8: '1O4YmfML4-yVbnwrC0bsg3CLKiBQ_QUuq',
+  9: '1FGyVxwkFANpbikYtEOjLzNqlCz0bs03N',
+  10: '1gu7GT77LeWPcWXHvGvxbUHjk_ZShrIvy',
+  11: '1KNHQGIQDTsXTmeQbEOEPTyDZWVK1Y4KD',
+  12: '1xsV6kdRIORo_hPzGsqTWpyHM4gn7MESv',
+};
+
+window._driveLink = '';
+window._driveFileName = '';
+
+function onPdfSelected() {
+  const file = document.getElementById('f-pdf').files[0];
+  if (!file) return;
+  window._driveFileName = file.name;
+  document.getElementById('upload-label').textContent = '📄 ' + file.name;
+  document.getElementById('upload-status').style.display = 'block';
+  document.getElementById('upload-icon').textContent = '⏳';
+  document.getElementById('upload-msg').textContent = 'PDF selecionado. Será enviado ao Drive ao salvar a emissão.';
+}
+
+async function uploadPdfToDrive(file, dataIda) {
+  try {
+    // Determinar pasta pelo mês da data de ida
+    let folderId = DRIVE_FOLDERS[6]; // padrão junho
+    if (dataIda) {
+      const mes = new Date(dataIda).getMonth() + 1;
+      folderId = DRIVE_FOLDERS[mes] || DRIVE_FOLDERS[6];
+    }
+
+    const reader = new FileReader();
+    return new Promise((resolve) => {
+      reader.onload = async (e) => {
+        const base64 = e.target.result.split(',')[1];
+        try {
+          const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + window._driveToken },
+            body: (() => {
+              const meta = JSON.stringify({ name: file.name, parents: [folderId] });
+              const boundary = '-------VIPUpload';
+              const body = '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + meta +
+                '\r\n--' + boundary + '\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: base64\r\n\r\n' + base64 +
+                '\r\n--' + boundary + '--';
+              return body;
+            })(),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            resolve('https://drive.google.com/file/d/' + data.id + '/view');
+          } else { resolve(''); }
+        } catch { resolve(''); }
+      };
+      reader.readAsDataURL(file);
+    });
+  } catch { return ''; }
+}
+
+function getIncentivoVal() {
+  const val = parseFloat(document.getElementById('f-valor').value) || 0;
+  const manual = document.getElementById('f-incentivo-manual').value;
+  return manual !== '' ? parseFloat(manual) || 0 : val * 0.05;
+}
+
+// ---- MÚLTIPLOS RECEBEDORES DE INCENTIVO ----
+function recebedorRowHTML(nome, valor) {
+  return `<div class="recebedor-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+    <input class="form-input recebedor-nome" placeholder="Nome (ex: Pablo)" value="${(nome||'').replace(/"/g,'&quot;')}" oninput="calcRecebedoresTotal()" style="flex:2;" />
+    <input class="form-input recebedor-valor" type="number" step="0.01" placeholder="0,00" value="${valor!==undefined&&valor!==null&&valor!==''?valor:''}" oninput="calcRecebedoresTotal()" style="flex:1;" />
+    <button type="button" class="btn-ghost" style="padding:6px 10px;flex:0 0 auto;" onclick="this.parentElement.remove();calcRecebedoresTotal();">✕</button>
+  </div>`;
+}
+function addRecebedor(nome, valor) {
+  const list = document.getElementById('recebedores-list');
+  list.insertAdjacentHTML('beforeend', recebedorRowHTML(nome, valor));
+  calcRecebedoresTotal();
+}
+function calcRecebedoresTotal() {
+  let total = 0;
+  document.querySelectorAll('#recebedores-list .recebedor-valor').forEach(i => { total += parseFloat(i.value) || 0; });
+  document.getElementById('recebedores-total').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  return total;
+}
+// Lê as linhas → array [{nome, valor}], ignorando linhas sem nome
+function coletarRecebedores() {
+  const out = [];
+  document.querySelectorAll('#recebedores-list .recebedor-row').forEach(row => {
+    const nome = row.querySelector('.recebedor-nome').value.trim();
+    const valor = parseFloat(row.querySelector('.recebedor-valor').value) || 0;
+    if (nome) out.push({ nome, valor });
+  });
+  return out;
+}
+// Serializa para o campo quemIncentivo (JSON se >1 ou tiver valores; texto simples se 1 sem valor)
+function serializarRecebedores(arr) {
+  if (!arr || arr.length === 0) return '';
+  if (arr.length === 1 && (!arr[0].valor)) return arr[0].nome;
+  return JSON.stringify(arr);
+}
+// Faz o parse de quemIncentivo (aceita JSON novo ou texto antigo)
+function parseRecebedores(raw) {
+  if (!raw) return [];
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try { const a = JSON.parse(raw); if (Array.isArray(a)) return a; } catch (e) {}
+  }
+  return [{ nome: String(raw), valor: 0 }];
+}
+// Texto legível para tabelas: "Pablo (R$50,00), Amanda (R$30,00)" ou só nomes
+function recebedoresTexto(raw) {
+  const arr = parseRecebedores(raw);
+  if (arr.length === 0) return '';
+  return arr.map(r => r.valor ? `${r.nome} (R$ ${Number(r.valor).toFixed(2).replace('.', ',')})` : r.nome).join(', ');
+}
+// Soma dos valores informados nos recebedores
+function recebedoresSoma(raw) {
+  return parseRecebedores(raw).reduce((s, r) => s + (Number(r.valor) || 0), 0);
+}
+
+// --- Versão para o modal de edição ---
+function addRecebedorModal(nome, valor) {
+  const list = document.getElementById('m-recebedores-list');
+  list.insertAdjacentHTML('beforeend', recebedorRowHTML(nome, valor).replace('recebedor-row', 'recebedor-row-m'));
+}
+function popularRecebedoresModal(raw) {
+  const list = document.getElementById('m-recebedores-list');
+  list.innerHTML = '';
+  const arr = parseRecebedores(raw);
+  if (arr.length === 0) { addRecebedorModal(); return; }
+  arr.forEach(r => addRecebedorModal(r.nome, r.valor || ''));
+}
+function coletarRecebedoresModal() {
+  const out = [];
+  document.querySelectorAll('#m-recebedores-list .recebedor-row-m').forEach(row => {
+    const nome = row.querySelector('.recebedor-nome').value.trim();
+    const valor = parseFloat(row.querySelector('.recebedor-valor').value) || 0;
+    if (nome) out.push({ nome, valor });
+  });
+  return out;
+}
+
+// ---- SALVAR EMISSÃO ----
+async function salvarEmissao() {
+  const loc = document.getElementById('f-loc').value.trim().toUpperCase();
+  const pax = document.getElementById('f-pax').value.trim();
+  if (!pax) { showToast('Informe o passageiro ou grupo!'); return; }
+
+  // Upload PDF se houver
+  const pdfFile = document.getElementById('f-pdf').files[0];
+  if (pdfFile) {
+    document.getElementById('upload-icon').textContent = '⏳';
+    document.getElementById('upload-msg').textContent = 'Enviando para o Google Drive...';
+    document.getElementById('upload-status').style.display = 'block';
+    const dataIda = document.getElementById('f-data-ida').value;
+    const link = await uploadPdfToDrive(pdfFile, dataIda);
+    window._driveLink = link;
+    if (link) {
+      document.getElementById('upload-icon').textContent = '✓';
+      document.getElementById('upload-msg').textContent = 'PDF salvo no Drive!';
+    } else {
+      document.getElementById('upload-icon').textContent = '⚠';
+      document.getElementById('upload-msg').textContent = 'Não foi possível enviar automaticamente. Salve manualmente no Drive.';
+    }
+  }
+
+  const tipoVoo = document.querySelector('input[name="tipo-voo"]:checked').value;
+  const dataIda = document.getElementById('f-data-ida').value;
+  const dataVolta = document.getElementById('f-data-volta').value;
+  const datavoo = fmtDataVoo(dataIda, dataVolta, tipoVoo);
+
+  const emissao = {
+    id: Date.now(),
+    loc: loc || '—',
+    cia: document.getElementById('f-cia').value,
+    pax,
+    qtd: parseInt(document.getElementById('f-qtd').value) || 1,
+    origem: document.getElementById('f-origem').value.trim().toUpperCase(),
+    destino: document.getElementById('f-destino').value.trim().toUpperCase(),
+    emissao: document.getElementById('f-emissao').value,
+    tipoVoo,
+    dataIda,
+    dataVolta,
+    datavoo,
+    plataforma: document.getElementById('f-plataforma').value,
+    usuarioMilhas: document.getElementById('f-usuario-milhas').value.trim(),
+    custoMilhas: parseFloat(document.getElementById('f-custo-milhas').value) || 0,
+    valor: parseFloat(document.getElementById('f-valor').value) || 0,
+    valorSite: parseFloat(document.getElementById('f-valor-site').value) || 0,
+    economia: calcEconomiaVal(),
+    driveLink: window._driveLink || '',
+    driveFileName: window._driveFileName || '',
+    incentivoManual: (function(){
+      const m = document.getElementById('f-incentivo-manual').value;
+      if (m !== '') return parseFloat(m) || 0;
+      const soma = recebedoresSoma(serializarRecebedores(coletarRecebedores()));
+      return soma > 0 ? soma : null;
+    })(),
+    quemReserva: document.getElementById('f-quem-reserva').value.trim(),
+    statusReserva: document.getElementById('f-status-reserva').value,
+    quemIncentivo: serializarRecebedores(coletarRecebedores()),
+    statusIncentivo: document.getElementById('f-status-incentivo').value,
+    obs: document.getElementById('f-obs').value.trim(),
+  };
+
+  emissoes.unshift(emissao);
+  saveBackup(); // salva local imediatamente
+  limparForm();
+  showToast('⏳ Salvando...');
+  const ok = await appendToSheet(emissao);
+  if (ok) {
+    showToast('✓ Emissão salva no Google Sheets!');
+  } else {
+    showToast('⚠ Salvo localmente. Sincronize quando conectar.');
+  }
+  renderDashboard();
+}
+
+function limparForm() {
+  ['f-loc','f-pax','f-origem','f-destino','f-emissao','f-data-ida','f-data-volta','f-valor','f-valor-site','f-incentivo-manual','f-quem-reserva','f-obs','f-usuario-milhas','f-custo-milhas'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-qtd').value = 1;
+  document.getElementById('f-cia').value = '';
+  document.getElementById('f-plataforma').value = '';
+  document.getElementById('f-status-reserva').value = 'Pendente';
+  document.getElementById('f-status-incentivo').value = 'Pendente';
+  document.getElementById('incentivo-calc').textContent = 'R$ 0,00';
+  document.getElementById('tipo-ida').checked = true;
+  document.getElementById('grupo-data-volta').style.display = 'none';
+  document.getElementById('grupo-data-volta-placeholder').style.display = 'block';
+  document.getElementById('f-pdf').value = '';
+  document.getElementById('upload-label').textContent = 'Clique para selecionar o PDF da reserva';
+  document.getElementById('upload-status').style.display = 'none';
+  document.getElementById('economia-calc').textContent = 'R$ 0,00';
+  document.getElementById('recebedores-list').innerHTML = '';
+  addRecebedor();
+  window._driveLink = '';
+  window._driveFileName = '';
+  document.getElementById('grupo-usuario-milhas').style.display = 'none';
+
+}
+
+function toggleTipoVoo() {
+  const isIdaVolta = document.getElementById('tipo-idavolta').checked;
+  document.getElementById('grupo-data-volta').style.display = isIdaVolta ? 'block' : 'none';
+  document.getElementById('grupo-data-volta-placeholder').style.display = isIdaVolta ? 'none' : 'block';
+}
+
+function togglePlataforma() {
+  const val = document.getElementById('f-plataforma').value;
+  const isMilhas = val === 'Milhas';
+  document.getElementById('grupo-usuario-milhas').style.display = isMilhas ? 'block' : 'none';
+}
+
+// ---- DASHBOARD ----
+function renderDashboard() {
+  const total = emissoes.reduce((a, e) => a + e.valor, 0);
+  const pendReserva = emissoes.filter(e => e.statusReserva === 'Pendente');
+  const pendIncentivo = emissoes.filter(e => e.statusIncentivo === 'Pendente');
+  const totalIncentivo = emissoes.reduce((a, e) => a + incentivo(e), 0);
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total Emitido</div>
+      <div class="stat-value accent">${fmtBRL(total)}</div>
+      <div class="stat-sub">${emissoes.length} emissões</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Incentivos Totais</div>
+      <div class="stat-value success">${fmtBRL(totalIncentivo)}</div>
+      <div class="stat-sub">5% do valor emitido</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Reservas Pendentes</div>
+      <div class="stat-value warning">${pendReserva.length}</div>
+      <div class="stat-sub">${fmtBRL(pendReserva.reduce((a,e)=>a+e.valor,0))}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Incentivos a Pagar</div>
+      <div class="stat-value danger">${pendIncentivo.length}</div>
+      <div class="stat-sub">${fmtBRL(pendIncentivo.reduce((a,e)=>a+incentivo(e),0))}</div>
+    </div>
+  `;
+
+  // listas pendências
+  document.getElementById('badge-reserva').textContent = pendReserva.length;
+  document.getElementById('badge-incentivo').textContent = pendIncentivo.length;
+
+  document.getElementById('list-reserva').innerHTML = pendReserva.length === 0
+    ? '<div class="empty-state">Nenhuma reserva pendente ✓</div>'
+    : pendReserva.slice(0,8).map(e => `
+        <div class="pend-item">
+          <div class="pend-info">
+            <div class="pend-pax">${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</div>
+            <div class="pend-rota">${e.origem} → ${e.destino}</div>
+          </div>
+          <div>
+            <div class="pend-valor">${fmtBRL(e.valor)}</div>
+            <div class="pend-quem">${e.quemReserva || '—'}</div>
+          </div>
+        </div>`).join('');
+
+  document.getElementById('list-incentivo').innerHTML = pendIncentivo.length === 0
+    ? '<div class="empty-state">Nenhum incentivo pendente ✓</div>'
+    : pendIncentivo.slice(0,8).map(e => `
+        <div class="pend-item">
+          <div class="pend-info">
+            <div class="pend-pax">${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</div>
+            <div class="pend-rota">${e.origem} → ${e.destino}</div>
+          </div>
+          <div>
+            <div class="pend-valor incentivo">${fmtBRL(incentivo(e))}</div>
+            <div class="pend-quem">${recebedoresTexto(e.quemIncentivo) || '—'}</div>
+          </div>
+        </div>`).join('');
+
+  // recentes
+  document.getElementById('tbody-recentes').innerHTML = emissoes.slice(0,10).map(e => `
+    <tr>
+      <td class="loc">${e.loc}</td>
+      <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
+      <td>${e.pax}${e.qtd > 1 ? ' <span style="color:var(--text-2);font-size:0.68rem">('+e.qtd+')</span>' : ''}</td>
+      <td class="rota">${e.origem} → ${e.destino}</td>
+      <td style="color:var(--text-2);font-size:0.72rem">${fmtDataVoo(e.dataIda, e.dataVolta, e.tipoVoo)}</td>
+      <td class="valor">${fmtBRL(e.valor)}</td>
+      <td class="incentivo-val">${fmtBRL(incentivo(e))}</td>
+      <td>${tagStatus(e.statusReserva)}</td>
+      <td>${tagStatus(e.statusIncentivo)}</td>
+    </tr>`).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:24px">Nenhuma emissão ainda. <a href="#" onclick="showView(\'lancamento\')" style="color:var(--accent)">Adicionar primeira</a></td></tr>';
+}
+
+// ---- TABELA COMPLETA ----
+function renderTabela() {
+  const search = (document.getElementById('search-input')?.value || '').toLowerCase();
+  const filterCia = document.getElementById('filter-cia')?.value || '';
+  const filterR = document.getElementById('filter-reserva')?.value || '';
+  const filterI = document.getElementById('filter-incentivo')?.value || '';
+
+  let data = emissoes.filter(e => {
+    const txt = [e.loc, e.pax, e.origem, e.destino, e.cia, e.quemReserva, recebedoresTexto(e.quemIncentivo), e.obs].join(' ').toLowerCase();
+    return (!search || txt.includes(search))
+      && (!filterCia || e.cia === filterCia)
+      && (!filterR || e.statusReserva === filterR)
+      && (!filterI || e.statusIncentivo === filterI);
+  });
+
+  document.getElementById('tbody-all').innerHTML = data.map(e => `
+    <tr>
+      <td class="loc">${e.loc}</td>
+      <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
+      <td>${e.pax}</td>
+      <td style="text-align:center">${e.qtd}</td>
+      <td class="rota">${e.origem} → ${e.destino}</td>
+      <td style="color:var(--text-2);font-size:0.72rem">${e.emissao || '—'}</td>
+      <td style="color:var(--text-2);font-size:0.72rem">${fmtDataVoo(e.dataIda, e.dataVolta, e.tipoVoo)}</td>
+      <td class="valor">${fmtBRL(e.valor)}</td>
+      <td class="incentivo-val">${fmtBRL(incentivo(e))}</td>
+      <td style="font-size:0.72rem;color:var(--text-2)">${e.quemReserva || '—'}</td>
+      <td>${tagStatus(e.statusReserva)}</td>
+      <td style="font-size:0.72rem;color:var(--text-2)">${recebedoresTexto(e.quemIncentivo) || '—'}</td>
+      <td>${tagStatus(e.statusIncentivo)}</td>
+      <td style="font-size:0.7rem;color:var(--text-3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.obs || ''}</td>
+      <td>${e.driveLink ? '<a href="'+e.driveLink+'" target="_blank" style="color:var(--accent);font-size:0.72rem;text-decoration:none;">📄 Ver</a>' : '<span style="color:var(--text-3);font-size:0.7rem">—</span>'}</td>
+      <td style="white-space:nowrap;">
+        <button class="act-btn" onclick="openEditModal(${e.id})" title="Editar emissão">✎</button>
+        <button class="act-btn" onclick="confirmarExcluir(${e.id})" title="Excluir" style="color:var(--danger)">✕</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="15" style="text-align:center;color:var(--text-3);padding:24px">Nenhum resultado</td></tr>';
+}
+
+// ---- PENDÊNCIAS ----
+function renderPendencias() {
+  const pendReserva = emissoes.filter(e => e.statusReserva === 'Pendente');
+  const pendIncentivo = emissoes.filter(e => e.statusIncentivo === 'Pendente');
+
+  document.getElementById('badge-reserva2').textContent = pendReserva.length;
+  document.getElementById('badge-incentivo2').textContent = pendIncentivo.length;
+
+  document.getElementById('tbody-pend-reserva').innerHTML = pendReserva.map(e => `
+    <tr>
+      <td class="loc">${e.loc}</td>
+      <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
+      <td>${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</td>
+      <td class="rota">${e.origem} → ${e.destino}</td>
+      <td style="color:var(--text-2);font-size:0.72rem">${fmtDataVoo(e.dataIda, e.dataVolta, e.tipoVoo)}</td>
+      <td class="valor" style="color:var(--warning)">${fmtBRL(e.valor)}</td>
+      <td style="font-size:0.72rem">${e.quemReserva || '—'}</td>
+      <td><button class="btn" style="padding:5px 12px;font-size:0.7rem" onclick="marcarPago(${e.id},'reserva')">Marcar Pago</button></td>
+    </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:20px">Nenhuma pendência ✓</td></tr>';
+
+  document.getElementById('tbody-pend-incentivo').innerHTML = pendIncentivo.map(e => `
+    <tr>
+      <td class="loc">${e.loc}</td>
+      <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
+      <td>${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</td>
+      <td class="rota">${e.origem} → ${e.destino}</td>
+      <td class="incentivo-val">${fmtBRL(incentivo(e))}</td>
+      <td style="font-size:0.72rem">${recebedoresTexto(e.quemIncentivo) || '—'}</td>
+      <td><button class="btn" style="padding:5px 12px;font-size:0.7rem" onclick="marcarPago(${e.id},'incentivo')">Marcar Pago</button></td>
+    </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:20px">Nenhuma pendência ✓</td></tr>';
+}
+
+function marcarPago(id, tipo) {
+  const e = emissoes.find(x => x.id === id);
+  if (!e) return;
+  if (tipo === 'reserva') e.statusReserva = 'Pago';
+  if (tipo === 'incentivo') e.statusIncentivo = 'Pago';
+  saveBackup();
+  renderPendencias();
+  renderDashboard();
+  showToast('⏳ Sincronizando...');
+  rewriteSheet().then(ok => {
+    showToast(ok ? '✓ Atualizado no Google Sheets!' : '⚠ Salvo localmente.');
+  });
+}
+
+// ---- MODAL EDIÇÃO ----
+let excluindoId = null;
+
+function openEditModal(id) {
+  editingId = id;
+  const e = emissoes.find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('m-loc').value = e.loc === '—' ? '' : e.loc;
+  document.getElementById('m-cia').value = e.cia || '';
+  document.getElementById('m-pax').value = e.pax || '';
+  document.getElementById('m-qtd').value = e.qtd || 1;
+  document.getElementById('m-origem').value = e.origem || '';
+  document.getElementById('m-destino').value = e.destino || '';
+  document.getElementById('m-emissao').value = e.emissao || '';
+  document.getElementById('m-data-ida').value = e.dataIda || '';
+  document.getElementById('m-data-volta').value = e.dataVolta || '';
+  document.getElementById('m-plataforma').value = e.plataforma || '';
+  document.getElementById('m-usuario-milhas').value = e.usuarioMilhas || '';
+  document.getElementById('m-custo').value = e.custoMilhas || '';
+  document.getElementById('m-valor').value = e.valor || '';
+  document.getElementById('m-valor-site').value = e.valorSite || '';
+  document.getElementById('m-incentivo').value = e.incentivoManual !== null && e.incentivoManual !== undefined ? e.incentivoManual : '';
+  document.getElementById('m-quem-reserva').value = e.quemReserva || '';
+  document.getElementById('m-status-reserva').value = e.statusReserva || 'Pendente';
+  popularRecebedoresModal(e.quemIncentivo);
+  document.getElementById('m-status-incentivo').value = e.statusIncentivo || 'Pendente';
+  document.getElementById('m-obs').value = e.obs || '';
+  toggleMilhasModal();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function toggleMilhasModal() {
+  const isMilhas = document.getElementById('m-plataforma').value === 'Milhas';
+  document.getElementById('m-grupo-milhas').style.display = isMilhas ? 'block' : 'none';
+}
+
+function calcIncentivoModal() {}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  editingId = null;
+}
+
+function salvarEdicao() {
+  const e = emissoes.find(x => x.id === editingId);
+  if (!e) return;
+  const dataIda = document.getElementById('m-data-ida').value;
+  const dataVolta = document.getElementById('m-data-volta').value;
+  e.loc = document.getElementById('m-loc').value.trim().toUpperCase() || '—';
+  e.cia = document.getElementById('m-cia').value;
+  e.pax = document.getElementById('m-pax').value.trim();
+  e.qtd = parseInt(document.getElementById('m-qtd').value) || 1;
+  e.origem = document.getElementById('m-origem').value.trim().toUpperCase();
+  e.destino = document.getElementById('m-destino').value.trim().toUpperCase();
+  e.emissao = document.getElementById('m-emissao').value;
+  e.dataIda = dataIda;
+  e.dataVolta = dataVolta;
+  e.datavoo = fmtDataVoo(dataIda, dataVolta, tipoVoo === 'idavolta' ? 'idavolta' : 'ida');
+  e.plataforma = document.getElementById('m-plataforma').value;
+  e.usuarioMilhas = document.getElementById('m-usuario-milhas').value.trim();
+  e.custoMilhas = parseFloat(document.getElementById('m-custo').value) || 0;
+  e.valor = parseFloat(document.getElementById('m-valor').value) || 0;
+  e.valorSite = parseFloat(document.getElementById('m-valor-site').value) || 0;
+  e.economia = e.valorSite - e.valor;
+  const incManual = document.getElementById('m-incentivo').value;
+  e.quemReserva = document.getElementById('m-quem-reserva').value.trim();
+  e.statusReserva = document.getElementById('m-status-reserva').value;
+  e.quemIncentivo = serializarRecebedores(coletarRecebedoresModal());
+  if (incManual !== '') {
+    e.incentivoManual = parseFloat(incManual) || 0;
+  } else {
+    const soma = recebedoresSoma(e.quemIncentivo);
+    e.incentivoManual = soma > 0 ? soma : null;
+  }
+  e.statusIncentivo = document.getElementById('m-status-incentivo').value;
+  e.obs = document.getElementById('m-obs').value.trim();
+  saveBackup();
+  closeModal();
+  renderTabela();
+  showToast('⏳ Atualizando...');
+  rewriteSheet().then(ok => {
+    showToast(ok ? '✓ Atualizado no Google Sheets!' : '⚠ Salvo localmente.');
+    renderDashboard();
+  });
+}
+
+function confirmarExcluir(id) {
+  excluindoId = id;
+  document.getElementById('modal-excluir').classList.add('open');
+}
+
+function excluirEmissao() {
+  emissoes = emissoes.filter(x => x.id !== excluindoId);
+  saveBackup();
+  document.getElementById('modal-excluir').classList.remove('open');
+  excluindoId = null;
+  renderTabela();
+  renderDashboard();
+  showToast('⏳ Excluindo...');
+  rewriteSheet().then(ok => {
+    showToast(ok ? '✓ Excluído do Google Sheets!' : '⚠ Removido localmente.');
+  });
+}
+
+// ---- TOAST ----
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ---- INIT ----
+async function init() {
+  updateSyncStatus('loading');
+  addRecebedor();
+  const ok = await loadFromSheet();
+  if (ok) {
+    updateSyncStatus('synced');
+  } else {
+    updateSyncStatus('local');
+  }
+  renderDashboard();
+}
+
+function updateSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const map = {
+    loading: ['⏳', 'Carregando...', '#888'],
+    synced:  ['☁ ✓', 'Sincronizado', '#4DFFB4'],
+    local:   ['💾', 'Modo local', '#FFB443'],
+    error:   ['⚠', 'Sem conexão', '#FF5C5C'],
+  };
+  const [icon, label, color] = map[status] || map.local;
+  el.innerHTML = icon + ' <span>' + label + '</span>';
+  el.style.color = color;
+}
+
+async function syncManual() {
+  updateSyncStatus('loading');
+  showToast('⏳ Sincronizando com Google Sheets...');
+  const ok = await loadFromSheet();
+  if (ok) {
+    updateSyncStatus('synced');
+    showToast('✓ Dados sincronizados!');
+    renderDashboard();
+    renderTabela();
+  } else {
+    updateSyncStatus('local');
+    showToast('⚠ Não foi possível conectar. Usando dados locais.');
+  }
+}
+
+
+
+init();
+</script>
+</body>
+</html>
