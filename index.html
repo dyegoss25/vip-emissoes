@@ -695,6 +695,7 @@ tbody tr:hover { background: var(--surface2); }
               <span class="incentivo-preview-label" style="font-size:0.72rem;">Total distribuído aos recebedores</span>
               <span class="incentivo-preview-val" id="recebedores-total" style="font-size:0.95rem;">R$ 0,00</span>
             </div>
+            <div id="recebedores-aviso" style="display:none;margin-top:8px;padding:8px 14px;border-radius:8px;background:var(--warning-dim,rgba(255,180,67,0.12));border:1px solid var(--warning,#FFB443);font-size:0.78rem;color:var(--warning,#FFB443);"></div>
             <input type="hidden" id="f-quem-incentivo" />
           </div>
           <div class="form-group">
@@ -1083,6 +1084,7 @@ function calcIncentivo() {
   const inc = manual !== '' ? parseFloat(manual) || 0 : val * 0.05;
   document.getElementById('incentivo-calc').textContent = fmtBRL(inc);
   calcEconomia();
+  if (typeof validarRecebedores === 'function') validarRecebedores();
 }
 
 function calcEconomia() {
@@ -1190,7 +1192,39 @@ function calcRecebedoresTotal() {
   document.querySelectorAll('#recebedores-list .recebedor-valor').forEach(i => { total += parseFloat(i.value) || 0; });
   const el = document.getElementById('recebedores-total');
   if (el) el.textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  validarRecebedores();
   return total;
+}
+// Compara a soma dos recebedores com o incentivo total e mostra/esconde o aviso
+function validarRecebedores() {
+  const aviso = document.getElementById('recebedores-aviso');
+  if (!aviso) return;
+  let soma = 0, qtdComValor = 0;
+  document.querySelectorAll('#recebedores-list .recebedor-valor').forEach(i => {
+    const v = parseFloat(i.value) || 0;
+    soma += v;
+    if (v > 0) qtdComValor++;
+  });
+  // Incentivo total atual: ajuste manual, ou soma dos recebedores, ou 5%
+  const val = parseFloat(document.getElementById('f-valor').value) || 0;
+  const manual = document.getElementById('f-incentivo-manual').value;
+  let total;
+  if (manual !== '') total = parseFloat(manual) || 0;
+  else if (soma > 0) total = soma;
+  else total = val * 0.05;
+  // Só avisa se há valores distribuídos E a soma não bate com o total
+  const dif = Math.round((total - soma) * 100) / 100;
+  if (qtdComValor > 0 && Math.abs(dif) >= 0.01) {
+    const fmt = n => 'R$ ' + Math.abs(n).toFixed(2).replace('.', ',');
+    if (dif > 0) {
+      aviso.textContent = `⚠ Faltam ${fmt(dif)} para fechar o incentivo total (${fmt(total)}). Soma dos recebedores: ${fmt(soma)}.`;
+    } else {
+      aviso.textContent = `⚠ A soma dos recebedores (${fmt(soma)}) passou ${fmt(dif)} do incentivo total (${fmt(total)}).`;
+    }
+    aviso.style.display = 'block';
+  } else {
+    aviso.style.display = 'none';
+  }
 }
 function coletarRecebedores() {
   const out = [];
