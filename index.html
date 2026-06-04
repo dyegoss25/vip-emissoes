@@ -687,9 +687,15 @@ tbody tr:hover { background: var(--surface2); }
               <option value="N/A">Não tem</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group form-full">
             <label class="form-label">Quem Recebe o Incentivo</label>
-            <input class="form-input" id="f-quem-incentivo" placeholder="Ex: Pablo, Ad Produção..." />
+            <div id="recebedores-list"></div>
+            <button type="button" class="btn-ghost" style="margin-top:8px;font-size:0.8rem;padding:6px 12px;" onclick="addRecebedor()">+ Adicionar recebedor</button>
+            <div class="incentivo-preview" style="margin-top:8px;padding:8px 14px;">
+              <span class="incentivo-preview-label" style="font-size:0.72rem;">Total distribuído aos recebedores</span>
+              <span class="incentivo-preview-val" id="recebedores-total" style="font-size:0.95rem;">R$ 0,00</span>
+            </div>
+            <input type="hidden" id="f-quem-incentivo" />
           </div>
           <div class="form-group">
             <label class="form-label">Status Incentivo</label>
@@ -898,9 +904,11 @@ tbody tr:hover { background: var(--surface2); }
           <option value="N/A">Não tem</option>
         </select>
       </div>
-      <div class="form-group">
+      <div class="form-group form-full">
         <label class="form-label">Quem Recebe Incentivo</label>
-        <input class="form-input" id="m-quem-incentivo" />
+        <div id="m-recebedores-list"></div>
+        <button type="button" class="btn-ghost" style="margin-top:8px;font-size:0.8rem;padding:6px 12px;" onclick="addRecebedorModal()">+ Adicionar recebedor</button>
+        <input type="hidden" id="m-quem-incentivo" />
       </div>
       <div class="form-group">
         <label class="form-label">Status Incentivo</label>
@@ -1164,6 +1172,77 @@ function getIncentivoVal() {
   return manual !== '' ? parseFloat(manual) || 0 : val * 0.05;
 }
 
+// ---- MÚLTIPLOS RECEBEDORES DE INCENTIVO ----
+function recebedorRowHTML(nome, valor) {
+  return `<div class="recebedor-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+    <input class="form-input recebedor-nome" placeholder="Nome (ex: Pablo)" value="${(nome||'').replace(/"/g,'&quot;')}" oninput="calcRecebedoresTotal()" style="flex:2;" />
+    <input class="form-input recebedor-valor" type="number" step="0.01" placeholder="0,00" value="${valor!==undefined&&valor!==null&&valor!==''?valor:''}" oninput="calcRecebedoresTotal()" style="flex:1;" />
+    <button type="button" class="btn-ghost" style="padding:6px 10px;flex:0 0 auto;" onclick="this.parentElement.remove();calcRecebedoresTotal();">✕</button>
+  </div>`;
+}
+function addRecebedor(nome, valor) {
+  const list = document.getElementById('recebedores-list');
+  list.insertAdjacentHTML('beforeend', recebedorRowHTML(nome, valor));
+  calcRecebedoresTotal();
+}
+function calcRecebedoresTotal() {
+  let total = 0;
+  document.querySelectorAll('#recebedores-list .recebedor-valor').forEach(i => { total += parseFloat(i.value) || 0; });
+  const el = document.getElementById('recebedores-total');
+  if (el) el.textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  return total;
+}
+function coletarRecebedores() {
+  const out = [];
+  document.querySelectorAll('#recebedores-list .recebedor-row').forEach(row => {
+    const nome = row.querySelector('.recebedor-nome').value.trim();
+    const valor = parseFloat(row.querySelector('.recebedor-valor').value) || 0;
+    if (nome) out.push({ nome, valor });
+  });
+  return out;
+}
+function serializarRecebedores(arr) {
+  if (!arr || arr.length === 0) return '';
+  if (arr.length === 1 && (!arr[0].valor)) return arr[0].nome;
+  return JSON.stringify(arr);
+}
+function parseRecebedores(raw) {
+  if (!raw) return [];
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try { const a = JSON.parse(raw); if (Array.isArray(a)) return a; } catch (e) {}
+  }
+  return [{ nome: String(raw), valor: 0 }];
+}
+function recebedoresTexto(raw) {
+  const arr = parseRecebedores(raw);
+  if (arr.length === 0) return '';
+  return arr.map(r => r.valor ? `${r.nome} (R$ ${Number(r.valor).toFixed(2).replace('.', ',')})` : r.nome).join(', ');
+}
+function recebedoresSoma(raw) {
+  return parseRecebedores(raw).reduce((s, r) => s + (Number(r.valor) || 0), 0);
+}
+// --- Versão para o modal de edição ---
+function addRecebedorModal(nome, valor) {
+  const list = document.getElementById('m-recebedores-list');
+  list.insertAdjacentHTML('beforeend', recebedorRowHTML(nome, valor).replace('recebedor-row', 'recebedor-row-m'));
+}
+function popularRecebedoresModal(raw) {
+  const list = document.getElementById('m-recebedores-list');
+  list.innerHTML = '';
+  const arr = parseRecebedores(raw);
+  if (arr.length === 0) { addRecebedorModal(); return; }
+  arr.forEach(r => addRecebedorModal(r.nome, r.valor || ''));
+}
+function coletarRecebedoresModal() {
+  const out = [];
+  document.querySelectorAll('#m-recebedores-list .recebedor-row-m').forEach(row => {
+    const nome = row.querySelector('.recebedor-nome').value.trim();
+    const valor = parseFloat(row.querySelector('.recebedor-valor').value) || 0;
+    if (nome) out.push({ nome, valor });
+  });
+  return out;
+}
+
 // ---- SALVAR EMISSÃO ----
 async function salvarEmissao() {
   const loc = document.getElementById('f-loc').value.trim().toUpperCase();
@@ -1214,10 +1293,15 @@ async function salvarEmissao() {
     economia: calcEconomiaVal(),
     driveLink: window._driveLink || '',
     driveFileName: window._driveFileName || '',
-    incentivoManual: document.getElementById('f-incentivo-manual').value !== '' ? parseFloat(document.getElementById('f-incentivo-manual').value) || 0 : null,
+    incentivoManual: (function(){
+      const m = document.getElementById('f-incentivo-manual').value;
+      if (m !== '') return parseFloat(m) || 0;
+      const soma = recebedoresSoma(serializarRecebedores(coletarRecebedores()));
+      return soma > 0 ? soma : null;
+    })(),
     quemReserva: document.getElementById('f-quem-reserva').value.trim(),
     statusReserva: document.getElementById('f-status-reserva').value,
-    quemIncentivo: document.getElementById('f-quem-incentivo').value.trim(),
+    quemIncentivo: serializarRecebedores(coletarRecebedores()),
     statusIncentivo: document.getElementById('f-status-incentivo').value,
     obs: document.getElementById('f-obs').value.trim(),
   };
@@ -1236,7 +1320,7 @@ async function salvarEmissao() {
 }
 
 function limparForm() {
-  ['f-loc','f-pax','f-origem','f-destino','f-emissao','f-data-ida','f-data-volta','f-valor','f-valor-site','f-incentivo-manual','f-quem-reserva','f-quem-incentivo','f-obs','f-usuario-milhas','f-custo-milhas'].forEach(id => {
+  ['f-loc','f-pax','f-origem','f-destino','f-emissao','f-data-ida','f-data-volta','f-valor','f-valor-site','f-incentivo-manual','f-quem-reserva','f-obs','f-usuario-milhas','f-custo-milhas'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('f-qtd').value = 1;
@@ -1252,6 +1336,8 @@ function limparForm() {
   document.getElementById('upload-label').textContent = 'Clique para selecionar o PDF da reserva';
   document.getElementById('upload-status').style.display = 'none';
   document.getElementById('economia-calc').textContent = 'R$ 0,00';
+  document.getElementById('recebedores-list').innerHTML = '';
+  addRecebedor();
   window._driveLink = '';
   window._driveFileName = '';
   document.getElementById('grupo-usuario-milhas').style.display = 'none';
@@ -1328,7 +1414,7 @@ function renderDashboard() {
           </div>
           <div>
             <div class="pend-valor incentivo">${fmtBRL(incentivo(e))}</div>
-            <div class="pend-quem">${e.quemIncentivo || '—'}</div>
+            <div class="pend-quem">${recebedoresTexto(e.quemIncentivo) || '—'}</div>
           </div>
         </div>`).join('');
 
@@ -1355,7 +1441,7 @@ function renderTabela() {
   const filterI = document.getElementById('filter-incentivo')?.value || '';
 
   let data = emissoes.filter(e => {
-    const txt = [e.loc, e.pax, e.origem, e.destino, e.cia, e.quemReserva, e.quemIncentivo, e.obs].join(' ').toLowerCase();
+    const txt = [e.loc, e.pax, e.origem, e.destino, e.cia, e.quemReserva, recebedoresTexto(e.quemIncentivo), e.obs].join(' ').toLowerCase();
     return (!search || txt.includes(search))
       && (!filterCia || e.cia === filterCia)
       && (!filterR || e.statusReserva === filterR)
@@ -1375,7 +1461,7 @@ function renderTabela() {
       <td class="incentivo-val">${fmtBRL(incentivo(e))}</td>
       <td style="font-size:0.72rem;color:var(--text-2)">${e.quemReserva || '—'}</td>
       <td>${tagStatus(e.statusReserva)}</td>
-      <td style="font-size:0.72rem;color:var(--text-2)">${e.quemIncentivo || '—'}</td>
+      <td style="font-size:0.72rem;color:var(--text-2)">${recebedoresTexto(e.quemIncentivo) || '—'}</td>
       <td>${tagStatus(e.statusIncentivo)}</td>
       <td style="font-size:0.7rem;color:var(--text-3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.obs || ''}</td>
       <td>${e.driveLink ? '<a href="'+e.driveLink+'" target="_blank" style="color:var(--accent);font-size:0.72rem;text-decoration:none;">📄 Ver</a>' : '<span style="color:var(--text-3);font-size:0.7rem">—</span>'}</td>
@@ -1413,7 +1499,7 @@ function renderPendencias() {
       <td>${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</td>
       <td class="rota">${e.origem} → ${e.destino}</td>
       <td class="incentivo-val">${fmtBRL(incentivo(e))}</td>
-      <td style="font-size:0.72rem">${e.quemIncentivo || '—'}</td>
+      <td style="font-size:0.72rem">${recebedoresTexto(e.quemIncentivo) || '—'}</td>
       <td><button class="btn" style="padding:5px 12px;font-size:0.7rem" onclick="marcarPago(${e.id},'incentivo')">Marcar Pago</button></td>
     </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:20px">Nenhuma pendência ✓</td></tr>';
 }
@@ -1456,7 +1542,7 @@ function openEditModal(id) {
   document.getElementById('m-incentivo').value = e.incentivoManual !== null && e.incentivoManual !== undefined ? e.incentivoManual : '';
   document.getElementById('m-quem-reserva').value = e.quemReserva || '';
   document.getElementById('m-status-reserva').value = e.statusReserva || 'Pendente';
-  document.getElementById('m-quem-incentivo').value = e.quemIncentivo || '';
+  popularRecebedoresModal(e.quemIncentivo);
   document.getElementById('m-status-incentivo').value = e.statusIncentivo || 'Pendente';
   document.getElementById('m-obs').value = e.obs || '';
   toggleMilhasModal();
@@ -1497,10 +1583,15 @@ function salvarEdicao() {
   e.valorSite = parseFloat(document.getElementById('m-valor-site').value) || 0;
   e.economia = e.valorSite - e.valor;
   const incManual = document.getElementById('m-incentivo').value;
-  e.incentivoManual = incManual !== '' ? parseFloat(incManual) || 0 : null;
   e.quemReserva = document.getElementById('m-quem-reserva').value.trim();
   e.statusReserva = document.getElementById('m-status-reserva').value;
-  e.quemIncentivo = document.getElementById('m-quem-incentivo').value.trim();
+  e.quemIncentivo = serializarRecebedores(coletarRecebedoresModal());
+  if (incManual !== '') {
+    e.incentivoManual = parseFloat(incManual) || 0;
+  } else {
+    const soma = recebedoresSoma(e.quemIncentivo);
+    e.incentivoManual = soma > 0 ? soma : null;
+  }
   e.statusIncentivo = document.getElementById('m-status-incentivo').value;
   e.obs = document.getElementById('m-obs').value.trim();
   saveBackup();
@@ -1542,6 +1633,7 @@ function showToast(msg) {
 // ---- INIT ----
 async function init() {
   updateSyncStatus('loading');
+  addRecebedor();
   const ok = await loadFromSheet();
   if (ok) {
     updateSyncStatus('synced');
