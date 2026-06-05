@@ -487,6 +487,21 @@ tbody tr:hover { background: var(--surface2); }
 
       <div class="stats-row" id="stats-row"></div>
 
+      <div class="charts-grid" id="charts-grid" style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:24px;">
+        <div class="pend-card">
+          <div class="pend-card-header">
+            <span class="pend-card-title" style="color:var(--accent)">📊 Faturamento × Lucro por mês</span>
+          </div>
+          <div id="chart-mensal" style="margin-top:12px;"></div>
+        </div>
+        <div class="pend-card">
+          <div class="pend-card-header">
+            <span class="pend-card-title" style="color:var(--accent)">✈ Por companhia</span>
+          </div>
+          <div id="chart-cia" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
       <div class="pendencias-grid">
         <div class="pend-card">
           <div class="pend-card-header">
@@ -1396,6 +1411,10 @@ function renderDashboard() {
   const pendReserva = emissoes.filter(e => e.statusReserva === 'Pendente');
   const pendIncentivo = emissoes.filter(e => e.statusIncentivo === 'Pendente');
   const totalIncentivo = emissoes.reduce((a, e) => a + incentivo(e), 0);
+  const totalCusto = emissoes.reduce((a, e) => a + (Number(e.custoMilhas) || 0), 0);
+  const lucroBruto = total - totalCusto;
+  const lucroLiquido = lucroBruto - totalIncentivo;
+  const margem = total > 0 ? (lucroLiquido / total) * 100 : 0;
 
   document.getElementById('stats-row').innerHTML = `
     <div class="stat-card">
@@ -1404,21 +1423,35 @@ function renderDashboard() {
       <div class="stat-sub">${emissoes.length} emissões</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Incentivos Totais</div>
-      <div class="stat-value success">${fmtBRL(totalIncentivo)}</div>
-      <div class="stat-sub">5% do valor emitido</div>
+      <div class="stat-label">Custo Total</div>
+      <div class="stat-value" style="color:var(--text-2)">${fmtBRL(totalCusto)}</div>
+      <div class="stat-sub">soma dos custos</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Reservas Pendentes</div>
-      <div class="stat-value warning">${pendReserva.length}</div>
-      <div class="stat-sub">${fmtBRL(pendReserva.reduce((a,e)=>a+e.valor,0))}</div>
+      <div class="stat-label">Lucro Bruto</div>
+      <div class="stat-value accent">${fmtBRL(lucroBruto)}</div>
+      <div class="stat-sub">venda − custo</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Incentivos a Pagar</div>
-      <div class="stat-value danger">${pendIncentivo.length}</div>
-      <div class="stat-sub">${fmtBRL(pendIncentivo.reduce((a,e)=>a+incentivo(e),0))}</div>
+      <div class="stat-label">Lucro Líquido</div>
+      <div class="stat-value ${lucroLiquido >= 0 ? 'success' : 'danger'}">${fmtBRL(lucroLiquido)}</div>
+      <div class="stat-sub">− incentivos (${fmtBRL(totalIncentivo)})</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Margem Líquida</div>
+      <div class="stat-value ${margem >= 0 ? 'success' : 'danger'}">${margem.toFixed(1).replace('.', ',')}%</div>
+      <div class="stat-sub">lucro líq. / total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pendências</div>
+      <div class="stat-value warning">${pendReserva.length + pendIncentivo.length}</div>
+      <div class="stat-sub">${pendReserva.length} reservas · ${pendIncentivo.length} incentivos</div>
     </div>
   `;
+
+  // Gráficos
+  renderChartMensal();
+  renderChartCia();
 
   // listas pendências
   document.getElementById('badge-reserva').textContent = pendReserva.length;
@@ -1465,6 +1498,101 @@ function renderDashboard() {
       <td>${tagStatus(e.statusReserva)}</td>
       <td>${tagStatus(e.statusIncentivo)}</td>
     </tr>`).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:24px">Nenhuma emissão ainda. <a href="#" onclick="showView(\'lancamento\')" style="color:var(--accent)">Adicionar primeira</a></td></tr>';
+}
+
+// ---- GRÁFICOS (SVG embutido, sem dependências) ----
+function mesAno(dataStr) {
+  // espera YYYY-MM-DD; retorna {key:'2026-05', label:'mai/26'}
+  if (!dataStr || dataStr.length < 7) return null;
+  const ano = dataStr.slice(0, 4), mes = dataStr.slice(5, 7);
+  const nomes = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const idx = parseInt(mes, 10) - 1;
+  if (idx < 0 || idx > 11) return null;
+  return { key: `${ano}-${mes}`, label: `${nomes[idx]}/${ano.slice(2)}` };
+}
+
+function renderChartMensal() {
+  const cont = document.getElementById('chart-mensal');
+  if (!cont) return;
+  // Agrupa por mês de emissão
+  const grupos = {};
+  emissoes.forEach(e => {
+    const m = mesAno(e.emissao);
+    if (!m) return;
+    if (!grupos[m.key]) grupos[m.key] = { label: m.label, fat: 0, lucro: 0 };
+    const custo = Number(e.custoMilhas) || 0;
+    grupos[m.key].fat += Number(e.valor) || 0;
+    grupos[m.key].lucro += (Number(e.valor) || 0) - custo - incentivo(e);
+  });
+  const chaves = Object.keys(grupos).sort().slice(-6); // últimos 6 meses
+  if (chaves.length === 0) {
+    cont.innerHTML = '<div class="empty-state">Sem dados com data de emissão ainda</div>';
+    return;
+  }
+  const dados = chaves.map(k => grupos[k]);
+  const maxVal = Math.max(...dados.map(d => Math.max(d.fat, d.lucro)), 1);
+  const W = 100, H = 160, padB = 22, padT = 8;
+  const n = dados.length;
+  const slotW = W / n;
+  const barW = slotW * 0.32;
+  let bars = '';
+  dados.forEach((d, i) => {
+    const cx = i * slotW + slotW / 2;
+    const hFat = ((d.fat / maxVal) * (H - padB - padT));
+    const hLuc = ((Math.max(d.lucro, 0) / maxVal) * (H - padB - padT));
+    const yFat = H - padB - hFat;
+    const yLuc = H - padB - hLuc;
+    bars += `
+      <rect x="${(cx - barW - 1).toFixed(1)}" y="${yFat.toFixed(1)}" width="${barW.toFixed(1)}" height="${hFat.toFixed(1)}" rx="1.5" fill="var(--accent)" opacity="0.9"><title>${d.label} · Faturamento ${fmtBRL(d.fat)}</title></rect>
+      <rect x="${(cx + 1).toFixed(1)}" y="${yLuc.toFixed(1)}" width="${barW.toFixed(1)}" height="${hLuc.toFixed(1)}" rx="1.5" fill="var(--success)"><title>${d.label} · Lucro ${fmtBRL(d.lucro)}</title></rect>
+      <text x="${cx.toFixed(1)}" y="${H - 8}" font-size="6" fill="var(--text-3)" text-anchor="middle">${d.label}</text>`;
+  });
+  cont.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;" preserveAspectRatio="xMidYMid meet">${bars}</svg>
+    <div style="display:flex;gap:16px;justify-content:center;margin-top:8px;font-size:0.72rem;">
+      <span style="color:var(--accent)">█ Faturamento</span>
+      <span style="color:var(--success)">█ Lucro líquido</span>
+    </div>`;
+}
+
+function renderChartCia() {
+  const cont = document.getElementById('chart-cia');
+  if (!cont) return;
+  const grupos = {};
+  emissoes.forEach(e => {
+    const c = (e.cia || 'Outros').toUpperCase();
+    let nome = 'Outros';
+    if (c.includes('GOL')) nome = 'GOL';
+    else if (c.includes('AZUL')) nome = 'Azul';
+    else if (c.includes('LATAM')) nome = 'LATAM';
+    else nome = e.cia || 'Outros';
+    if (!grupos[nome]) grupos[nome] = { fat: 0, qtd: 0 };
+    grupos[nome].fat += Number(e.valor) || 0;
+    grupos[nome].qtd++;
+  });
+  const nomes = Object.keys(grupos);
+  if (nomes.length === 0) {
+    cont.innerHTML = '<div class="empty-state">Sem emissões ainda</div>';
+    return;
+  }
+  const cores = { 'GOL': '#FF6600', 'LATAM': '#E8192C', 'Azul': '#003DA5' };
+  const totalFat = nomes.reduce((a, n) => a + grupos[n].fat, 0) || 1;
+  let rows = '';
+  nomes.sort((a, b) => grupos[b].fat - grupos[a].fat).forEach(n => {
+    const pct = (grupos[n].fat / totalFat) * 100;
+    const cor = cores[n] || 'var(--accent)';
+    rows += `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.74rem;margin-bottom:4px;">
+          <span style="color:var(--text);font-weight:500;">${n} <span style="color:var(--text-3);font-weight:400;">(${grupos[n].qtd})</span></span>
+          <span style="color:var(--text-2);">${fmtBRL(grupos[n].fat)} · ${pct.toFixed(0)}%</span>
+        </div>
+        <div style="height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;">
+          <div style="height:100%;width:${pct.toFixed(1)}%;background:${cor};border-radius:4px;"></div>
+        </div>
+      </div>`;
+  });
+  cont.innerHTML = rows;
 }
 
 // ---- TABELA COMPLETA ----
