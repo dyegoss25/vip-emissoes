@@ -286,6 +286,37 @@ td {
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--surface2); }
 
+/* Colunas fixas (Localizador, Cia, Passageiro) ficam sempre visíveis ao rolar */
+#view-emissoes table th:nth-child(1),
+#view-emissoes table td:nth-child(1) {
+  position: sticky; left: 0; z-index: 3;
+  background: var(--surface);
+  min-width: 80px; max-width: 80px;
+}
+#view-emissoes table th:nth-child(2),
+#view-emissoes table td:nth-child(2) {
+  position: sticky; left: 80px; z-index: 3;
+  background: var(--surface);
+  min-width: 60px; max-width: 60px;
+}
+#view-emissoes table th:nth-child(3),
+#view-emissoes table td:nth-child(3) {
+  position: sticky; left: 140px; z-index: 3;
+  background: var(--surface);
+  min-width: 150px;
+  box-shadow: 2px 0 6px rgba(0,0,0,0.35);
+}
+#view-emissoes thead th:nth-child(1),
+#view-emissoes thead th:nth-child(2),
+#view-emissoes thead th:nth-child(3) {
+  background: var(--surface2); z-index: 4;
+}
+#view-emissoes tbody tr:hover td:nth-child(1),
+#view-emissoes tbody tr:hover td:nth-child(2),
+#view-emissoes tbody tr:hover td:nth-child(3) {
+  background: var(--surface2);
+}
+
 .loc { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--accent); }
 .rota { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text-2); }
 .valor { font-family: 'DM Mono', monospace; font-weight: 500; }
