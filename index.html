@@ -264,6 +264,14 @@ body {
   overflow: hidden;
 }
 .table-scroll { overflow-x: auto; }
+/* Barra de rolagem horizontal mais grossa e fácil de clicar */
+.table-scroll::-webkit-scrollbar { height: 16px; }
+.table-scroll::-webkit-scrollbar-track { background: var(--surface2); border-radius: 8px; }
+.table-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent); border-radius: 8px; border: 3px solid var(--surface2);
+}
+.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--accent); opacity: 0.8; }
+.table-scroll { scrollbar-color: var(--accent) var(--surface2); scrollbar-width: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 900px; }
 thead tr { background: var(--surface2); }
 th {
@@ -481,7 +489,7 @@ tbody tr:hover { background: var(--surface2); }
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="logo">
-      <div class="logo-title">VIP Universal</div>
+      <div class="logo-title">VIP Universal Tour</div>
       <div class="logo-sub">Controle de Emissões</div>
     </div>
     <nav>
@@ -518,18 +526,33 @@ tbody tr:hover { background: var(--surface2); }
 
       <div class="stats-row" id="stats-row"></div>
 
-      <div class="charts-grid" id="charts-grid" style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:24px;">
-        <div class="pend-card">
+      <!-- PRÓXIMOS VOOS (7 dias) -->
+      <div class="pend-card" style="margin-bottom:24px;">
+        <div class="pend-card-header">
+          <span class="pend-card-title" style="color:var(--accent)">🛫 Próximos voos (7 dias)</span>
+          <span class="badge-count" id="badge-proximos">0</span>
+        </div>
+        <div id="list-proximos" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="charts-grid" id="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+        <div class="pend-card" style="grid-column:1 / -1;">
           <div class="pend-card-header">
             <span class="pend-card-title" style="color:var(--accent)">📊 Faturamento × Lucro por mês</span>
           </div>
-          <div id="chart-mensal" style="margin-top:12px;"></div>
+          <div id="chart-mensal" style="margin-top:12px;max-width:560px;"></div>
         </div>
         <div class="pend-card">
           <div class="pend-card-header">
-            <span class="pend-card-title" style="color:var(--accent)">✈ Por companhia</span>
+            <span class="pend-card-title" style="color:var(--accent)">👤 Por pagante</span>
           </div>
-          <div id="chart-cia" style="margin-top:12px;"></div>
+          <div id="chart-pagante" style="margin-top:12px;"></div>
+        </div>
+        <div class="pend-card">
+          <div class="pend-card-header">
+            <span class="pend-card-title" style="color:var(--accent)">🖥 Por plataforma</span>
+          </div>
+          <div id="chart-plataforma" style="margin-top:12px;"></div>
         </div>
       </div>
 
@@ -1490,6 +1513,50 @@ function togglePlataforma() {
 }
 
 // ---- DASHBOARD ----
+// Agrupa pendências por pagador (reserva) ou por recebedor (incentivo), somando valores
+function renderPendAgrupado(lista, tipo) {
+  if (!lista || lista.length === 0) {
+    return `<div class="empty-state">Nenhum ${tipo === 'reserva' ? 'a receber' : 'incentivo'} pendente ✓</div>`;
+  }
+  const grupos = {};
+  lista.forEach(e => {
+    if (tipo === 'reserva') {
+      const nome = (e.quemReserva || '').trim() || '—';
+      if (!grupos[nome]) grupos[nome] = { valor: 0, qtd: 0 };
+      grupos[nome].valor += Number(e.valor) || 0;
+      grupos[nome].qtd++;
+    } else {
+      // incentivo: pode ter vários recebedores; agrupa por cada recebedor
+      const recs = parseRecebedores(e.quemIncentivo);
+      if (recs.length > 0) {
+        recs.forEach(r => {
+          const nome = (r.nome || '').trim() || '—';
+          if (!grupos[nome]) grupos[nome] = { valor: 0, qtd: 0 };
+          grupos[nome].valor += Number(r.valor) || 0;
+          grupos[nome].qtd++;
+        });
+      } else {
+        const nome = (recebedoresTexto(e.quemIncentivo) || '—');
+        if (!grupos[nome]) grupos[nome] = { valor: 0, qtd: 0 };
+        grupos[nome].valor += incentivo(e);
+        grupos[nome].qtd++;
+      }
+    }
+  });
+  const nomes = Object.keys(grupos).sort((a, b) => grupos[b].valor - grupos[a].valor);
+  const classe = tipo === 'incentivo' ? 'incentivo' : '';
+  return nomes.map(n => `
+    <div class="pend-item">
+      <div class="pend-info">
+        <div class="pend-pax">${n}</div>
+        <div class="pend-rota">${grupos[n].qtd} ${grupos[n].qtd > 1 ? 'lançamentos' : 'lançamento'}</div>
+      </div>
+      <div>
+        <div class="pend-valor ${classe}">${fmtBRL(grupos[n].valor)}</div>
+      </div>
+    </div>`).join('');
+}
+
 function renderDashboard() {
   const total = emissoes.reduce((a, e) => a + e.valor, 0);
   const pendReserva = emissoes.filter(e => e.statusReserva === 'Pendente');
@@ -1535,39 +1602,17 @@ function renderDashboard() {
 
   // Gráficos
   renderChartMensal();
-  renderChartCia();
+  renderChartPagante();
+  renderChartPlataforma();
+  renderProximosVoos();
 
   // listas pendências
   document.getElementById('badge-reserva').textContent = pendReserva.length;
   document.getElementById('badge-incentivo').textContent = pendIncentivo.length;
 
-  document.getElementById('list-reserva').innerHTML = pendReserva.length === 0
-    ? '<div class="empty-state">Nenhuma reserva pendente ✓</div>'
-    : pendReserva.slice(0,8).map(e => `
-        <div class="pend-item">
-          <div class="pend-info">
-            <div class="pend-pax">${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</div>
-            <div class="pend-rota">${e.origem} → ${e.destino}</div>
-          </div>
-          <div>
-            <div class="pend-valor">${fmtBRL(e.valor)}</div>
-            <div class="pend-quem">${e.quemReserva || '—'}</div>
-          </div>
-        </div>`).join('');
+  document.getElementById('list-reserva').innerHTML = renderPendAgrupado(pendReserva, 'reserva');
 
-  document.getElementById('list-incentivo').innerHTML = pendIncentivo.length === 0
-    ? '<div class="empty-state">Nenhum incentivo pendente ✓</div>'
-    : pendIncentivo.slice(0,8).map(e => `
-        <div class="pend-item">
-          <div class="pend-info">
-            <div class="pend-pax">${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</div>
-            <div class="pend-rota">${e.origem} → ${e.destino}</div>
-          </div>
-          <div>
-            <div class="pend-valor incentivo">${fmtBRL(incentivo(e))}</div>
-            <div class="pend-quem">${recebedoresTexto(e.quemIncentivo) || '—'}</div>
-          </div>
-        </div>`).join('');
+  document.getElementById('list-incentivo').innerHTML = renderPendAgrupado(pendIncentivo, 'incentivo');
 
   // recentes
   document.getElementById('tbody-recentes').innerHTML = emissoes.slice(0,10).map(e => `
@@ -1615,7 +1660,7 @@ function renderChartMensal() {
   }
   const dados = chaves.map(k => grupos[k]);
   const maxVal = Math.max(...dados.map(d => Math.max(d.fat, d.lucro)), 1);
-  const W = 100, H = 160, padB = 22, padT = 8;
+  const W = 100, H = 90, padB = 14, padT = 6;
   const n = dados.length;
   const slotW = W / n;
   const barW = slotW * 0.32;
@@ -1629,7 +1674,7 @@ function renderChartMensal() {
     bars += `
       <rect x="${(cx - barW - 1).toFixed(1)}" y="${yFat.toFixed(1)}" width="${barW.toFixed(1)}" height="${hFat.toFixed(1)}" rx="1.5" fill="var(--accent)" opacity="0.9"><title>${d.label} · Faturamento ${fmtBRL(d.fat)}</title></rect>
       <rect x="${(cx + 1).toFixed(1)}" y="${yLuc.toFixed(1)}" width="${barW.toFixed(1)}" height="${hLuc.toFixed(1)}" rx="1.5" fill="var(--success)"><title>${d.label} · Lucro ${fmtBRL(d.lucro)}</title></rect>
-      <text x="${cx.toFixed(1)}" y="${H - 8}" font-size="6" fill="var(--text-3)" text-anchor="middle">${d.label}</text>`;
+      <text x="${cx.toFixed(1)}" y="${H - 5}" font-size="5" fill="var(--text-3)" text-anchor="middle">${d.label}</text>`;
   });
   cont.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;" preserveAspectRatio="xMidYMid meet">${bars}</svg>
@@ -1639,36 +1684,25 @@ function renderChartMensal() {
     </div>`;
 }
 
-function renderChartCia() {
-  const cont = document.getElementById('chart-cia');
+// Gráfico de barras horizontais genérico (usado por pagante e plataforma)
+function renderBarChart(contId, grupos, emptyMsg) {
+  const cont = document.getElementById(contId);
   if (!cont) return;
-  const grupos = {};
-  emissoes.forEach(e => {
-    const c = (e.cia || 'Outros').toUpperCase();
-    let nome = 'Outros';
-    if (c.includes('GOL')) nome = 'GOL';
-    else if (c.includes('AZUL')) nome = 'Azul';
-    else if (c.includes('LATAM')) nome = 'LATAM';
-    else nome = e.cia || 'Outros';
-    if (!grupos[nome]) grupos[nome] = { fat: 0, qtd: 0 };
-    grupos[nome].fat += Number(e.valor) || 0;
-    grupos[nome].qtd++;
-  });
   const nomes = Object.keys(grupos);
   if (nomes.length === 0) {
-    cont.innerHTML = '<div class="empty-state">Sem emissões ainda</div>';
+    cont.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
     return;
   }
-  const cores = { 'GOL': '#FF6600', 'LATAM': '#E8192C', 'Azul': '#003DA5' };
   const totalFat = nomes.reduce((a, n) => a + grupos[n].fat, 0) || 1;
+  const paleta = ['var(--accent)', '#E8192C', '#003DA5', '#FF6600', '#9b59b6', '#16a085', '#e67e22', '#2980b9'];
   let rows = '';
-  nomes.sort((a, b) => grupos[b].fat - grupos[a].fat).forEach(n => {
+  nomes.sort((a, b) => grupos[b].fat - grupos[a].fat).forEach((n, i) => {
     const pct = (grupos[n].fat / totalFat) * 100;
-    const cor = cores[n] || 'var(--accent)';
+    const cor = paleta[i % paleta.length];
     rows += `
       <div style="margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;font-size:0.74rem;margin-bottom:4px;">
-          <span style="color:var(--text);font-weight:500;">${n} <span style="color:var(--text-3);font-weight:400;">(${grupos[n].qtd})</span></span>
+          <span style="color:var(--text);font-weight:500;">${n || '—'} <span style="color:var(--text-3);font-weight:400;">(${grupos[n].qtd})</span></span>
           <span style="color:var(--text-2);">${fmtBRL(grupos[n].fat)} · ${pct.toFixed(0)}%</span>
         </div>
         <div style="height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;">
@@ -1677,6 +1711,66 @@ function renderChartCia() {
       </div>`;
   });
   cont.innerHTML = rows;
+}
+
+function renderChartPagante() {
+  const grupos = {};
+  emissoes.forEach(e => {
+    const nome = (e.quemReserva || '').trim() || '—';
+    if (!grupos[nome]) grupos[nome] = { fat: 0, qtd: 0 };
+    grupos[nome].fat += Number(e.valor) || 0;
+    grupos[nome].qtd++;
+  });
+  renderBarChart('chart-pagante', grupos, 'Sem emissões ainda');
+}
+
+function renderChartPlataforma() {
+  const grupos = {};
+  emissoes.forEach(e => {
+    const nome = (e.plataforma || '').trim() || '—';
+    if (!grupos[nome]) grupos[nome] = { fat: 0, qtd: 0 };
+    grupos[nome].fat += Number(e.valor) || 0;
+    grupos[nome].qtd++;
+  });
+  renderBarChart('chart-plataforma', grupos, 'Sem emissões ainda');
+}
+
+// Próximos voos dentro de 7 dias
+function renderProximosVoos() {
+  const cont = document.getElementById('list-proximos');
+  const badge = document.getElementById('badge-proximos');
+  if (!cont) return;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const limite = new Date(hoje); limite.setDate(limite.getDate() + 7);
+  const proximos = [];
+  emissoes.forEach(e => {
+    const ds = dataParaInput(e.dataIda);
+    if (!ds) return;
+    const d = new Date(ds + 'T00:00:00');
+    if (isNaN(d.getTime())) return;
+    if (d >= hoje && d <= limite) proximos.push({ e, d });
+  });
+  proximos.sort((a, b) => a.d - b.d);
+  if (badge) badge.textContent = proximos.length;
+  if (proximos.length === 0) {
+    cont.innerHTML = '<div class="empty-state">Nenhum voo nos próximos 7 dias</div>';
+    return;
+  }
+  cont.innerHTML = proximos.map(({ e, d }) => {
+    const dia = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0');
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <span style="color:var(--accent);font-weight:600;">${dia}</span>
+          <span style="color:var(--text);margin-left:10px;">${e.pax || '—'}</span>
+          <span style="color:var(--text-3);font-size:0.72rem;margin-left:8px;">${e.origem || ''} → ${e.destino || ''}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="cia-tag ${ciaClass(e.cia)}">${e.cia || ''}</span>
+          <span class="loc" style="font-size:0.72rem;">${e.loc || ''}</span>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 // ---- TABELA COMPLETA ----
