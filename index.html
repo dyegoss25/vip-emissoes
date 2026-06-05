@@ -1771,7 +1771,9 @@ function salvarEdicao() {
   e.emissao = document.getElementById('m-emissao').value;
   e.dataIda = dataIda;
   e.dataVolta = dataVolta;
-  e.datavoo = fmtDataVoo(dataIda, dataVolta, tipoVoo === 'idavolta' ? 'idavolta' : 'ida');
+  const tipoVooEdit = dataVolta ? 'idavolta' : 'ida';
+  e.tipoVoo = tipoVooEdit;
+  e.datavoo = fmtDataVoo(dataIda, dataVolta, tipoVooEdit);
   e.plataforma = document.getElementById('m-plataforma').value;
   e.usuarioMilhas = document.getElementById('m-usuario-milhas').value.trim();
   e.custoMilhas = moedaParaNumero(document.getElementById('m-custo').value);
