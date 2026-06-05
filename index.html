@@ -636,13 +636,13 @@ tbody tr:hover { background: var(--surface2); }
           </div>
           <div class="form-group">
             <label class="form-label">Custo de Emissão (R$)</label>
-            <input class="form-input" id="f-custo-milhas" type="number" step="0.01" placeholder="0,00" />
+            <input class="form-input" id="f-custo-milhas" type="text" inputmode="numeric" placeholder="0,00" oninput="mascararMoeda(this)" />
           </div>
 
           <!-- VALOR -->
           <div class="form-group form-full">
             <label class="form-label">Valor Total (R$)</label>
-            <input class="form-input" id="f-valor" type="number" step="0.01" placeholder="0,00" oninput="calcIncentivo()" />
+            <input class="form-input" id="f-valor" type="text" inputmode="numeric" placeholder="0,00" oninput="mascararMoeda(this);calcIncentivo()" />
           </div>
           <div class="form-full incentivo-preview" style="flex-direction:column;gap:10px;align-items:stretch;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -651,14 +651,14 @@ tbody tr:hover { background: var(--surface2); }
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
               <label class="form-label" style="white-space:nowrap;margin:0;">Ajuste manual:</label>
-              <input class="form-input" id="f-incentivo-manual" type="number" step="0.01" placeholder="Deixe vazio para usar 5% automático"
-                style="flex:1;" oninput="calcIncentivo()" />
+              <input class="form-input" id="f-incentivo-manual" type="text" inputmode="numeric" placeholder="Deixe vazio para usar 5% automático"
+                style="flex:1;" oninput="mascararMoeda(this);calcIncentivo()" />
             </div>
           </div>
           <!-- VALOR DO SITE E ECONOMIA -->
           <div class="form-group">
             <label class="form-label">Valor do Site (R$)</label>
-            <input class="form-input" id="f-valor-site" type="number" step="0.01" placeholder="0,00" oninput="calcEconomia()" />
+            <input class="form-input" id="f-valor-site" type="text" inputmode="numeric" placeholder="0,00" oninput="mascararMoeda(this);calcEconomia()" />
           </div>
           <div class="form-group">
             <label class="form-label">Economia Gerada</label>
@@ -894,19 +894,19 @@ tbody tr:hover { background: var(--surface2); }
       </div>
       <div class="form-group">
         <label class="form-label">Custo de Emissão (R$)</label>
-        <input class="form-input" id="m-custo" type="number" step="0.01" />
+        <input class="form-input" id="m-custo" type="text" inputmode="numeric" oninput="mascararMoeda(this)" />
       </div>
       <div class="form-group">
         <label class="form-label">Valor Total (R$)</label>
-        <input class="form-input" id="m-valor" type="number" step="0.01" oninput="calcIncentivoModal()" />
+        <input class="form-input" id="m-valor" type="text" inputmode="numeric" oninput="mascararMoeda(this);calcIncentivoModal()" />
       </div>
       <div class="form-group">
         <label class="form-label">Valor do Site (R$)</label>
-        <input class="form-input" id="m-valor-site" type="number" step="0.01" oninput="calcIncentivoModal()" />
+        <input class="form-input" id="m-valor-site" type="text" inputmode="numeric" oninput="mascararMoeda(this);calcIncentivoModal()" />
       </div>
       <div class="form-group">
         <label class="form-label">Incentivo a Repassar (R$)</label>
-        <input class="form-input" id="m-incentivo" type="number" step="0.01" placeholder="Vazio = 5% automático" />
+        <input class="form-input" id="m-incentivo" type="text" inputmode="numeric" placeholder="Vazio = 5% automático" oninput="mascararMoeda(this)" />
       </div>
       <div class="form-group">
         <label class="form-label">Quem Paga a Reserva</label>
@@ -1056,6 +1056,37 @@ function fmtBRL(v) {
   return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ---- MÁSCARA DE MOEDA (entrada em centavos, estilo maquininha) ----
+// Lê o número real (em reais) a partir de um campo com máscara de moeda.
+function moedaParaNumero(str) {
+  if (str === null || str === undefined) return 0;
+  // mantém só dígitos; os 2 últimos são centavos
+  const digitos = String(str).replace(/\D/g, '');
+  if (digitos === '') return 0;
+  return parseInt(digitos, 10) / 100;
+}
+// Formata um número (reais) como texto de moeda BR sem o "R$" (ex: 42.336,82)
+function numeroParaMoeda(n) {
+  return Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// Handler chamado a cada digitação: reformata o campo em tempo real.
+function mascararMoeda(el) {
+  const num = moedaParaNumero(el.value);
+  el.value = num === 0 && el.value.replace(/\D/g, '') === '' ? '' : numeroParaMoeda(num);
+  // posiciona o cursor no fim
+  if (typeof el.selectionStart === 'number') {
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  }
+}
+// Preenche um campo de moeda a partir de um número (usado ao abrir o modal)
+function setMoeda(id, valor) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (valor === '' || valor === null || valor === undefined) { el.value = ''; return; }
+  el.value = numeroParaMoeda(valor);
+}
+
 function fmtData(d) {
   if (!d) return '—';
   // Se já estiver no formato DD/MM/AAAA, retorna como está
@@ -1094,17 +1125,18 @@ function tagStatus(s) {
 
 // ---- CALC INCENTIVO ----
 function calcIncentivo() {
-  const val = parseFloat(document.getElementById('f-valor').value) || 0;
-  const manual = document.getElementById('f-incentivo-manual').value;
-  const inc = manual !== '' ? parseFloat(manual) || 0 : val * 0.05;
+  const val = moedaParaNumero(document.getElementById('f-valor').value);
+  const manualStr = document.getElementById('f-incentivo-manual').value;
+  const temManual = manualStr.replace(/\D/g,'') !== '';
+  const inc = temManual ? moedaParaNumero(manualStr) : val * 0.05;
   document.getElementById('incentivo-calc').textContent = fmtBRL(inc);
   calcEconomia();
   if (typeof validarRecebedores === 'function') validarRecebedores();
 }
 
 function calcEconomia() {
-  const site = parseFloat(document.getElementById('f-valor-site').value) || 0;
-  const venda = parseFloat(document.getElementById('f-valor').value) || 0;
+  const site = moedaParaNumero(document.getElementById('f-valor-site').value);
+  const venda = moedaParaNumero(document.getElementById('f-valor').value);
   const eco = site - venda;
   const el = document.getElementById('economia-calc');
   el.textContent = fmtBRL(eco);
@@ -1112,8 +1144,8 @@ function calcEconomia() {
 }
 
 function calcEconomiaVal() {
-  const site = parseFloat(document.getElementById('f-valor-site').value) || 0;
-  const venda = parseFloat(document.getElementById('f-valor').value) || 0;
+  const site = moedaParaNumero(document.getElementById('f-valor-site').value);
+  const venda = moedaParaNumero(document.getElementById('f-valor').value);
   return site - venda;
 }
 
@@ -1184,16 +1216,17 @@ async function uploadPdfToDrive(file, dataIda) {
 }
 
 function getIncentivoVal() {
-  const val = parseFloat(document.getElementById('f-valor').value) || 0;
-  const manual = document.getElementById('f-incentivo-manual').value;
-  return manual !== '' ? parseFloat(manual) || 0 : val * 0.05;
+  const val = moedaParaNumero(document.getElementById('f-valor').value);
+  const manualStr = document.getElementById('f-incentivo-manual').value;
+  const temManual = manualStr.replace(/\D/g,'') !== '';
+  return temManual ? moedaParaNumero(manualStr) : val * 0.05;
 }
 
 // ---- MÚLTIPLOS RECEBEDORES DE INCENTIVO ----
 function recebedorRowHTML(nome, valor) {
   return `<div class="recebedor-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
     <input class="form-input recebedor-nome" placeholder="Nome (ex: Pablo)" value="${(nome||'').replace(/"/g,'&quot;')}" oninput="calcRecebedoresTotal()" style="flex:2;" />
-    <input class="form-input recebedor-valor" type="number" step="0.01" placeholder="0,00" value="${valor!==undefined&&valor!==null&&valor!==''?valor:''}" oninput="calcRecebedoresTotal()" style="flex:1;" />
+    <input class="form-input recebedor-valor" type="text" inputmode="numeric" placeholder="0,00" value="${valor!==undefined&&valor!==null&&valor!==''?numeroParaMoeda(valor):''}" oninput="mascararMoeda(this);calcRecebedoresTotal()" style="flex:1;" />
     <button type="button" class="btn-ghost" style="padding:6px 10px;flex:0 0 auto;" onclick="this.parentElement.remove();calcRecebedoresTotal();">✕</button>
   </div>`;
 }
@@ -1204,7 +1237,7 @@ function addRecebedor(nome, valor) {
 }
 function calcRecebedoresTotal() {
   let total = 0;
-  document.querySelectorAll('#recebedores-list .recebedor-valor').forEach(i => { total += parseFloat(i.value) || 0; });
+  document.querySelectorAll('#recebedores-list .recebedor-valor').forEach(i => { total += moedaParaNumero(i.value); });
   const el = document.getElementById('recebedores-total');
   if (el) el.textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
   validarRecebedores();
@@ -1216,15 +1249,16 @@ function validarRecebedores() {
   if (!aviso) return;
   let soma = 0, qtdComValor = 0;
   document.querySelectorAll('#recebedores-list .recebedor-valor').forEach(i => {
-    const v = parseFloat(i.value) || 0;
+    const v = moedaParaNumero(i.value);
     soma += v;
     if (v > 0) qtdComValor++;
   });
   // Incentivo total atual: ajuste manual, ou soma dos recebedores, ou 5%
-  const val = parseFloat(document.getElementById('f-valor').value) || 0;
-  const manual = document.getElementById('f-incentivo-manual').value;
+  const val = moedaParaNumero(document.getElementById('f-valor').value);
+  const manualStr = document.getElementById('f-incentivo-manual').value;
+  const temManual = manualStr.replace(/\D/g,'') !== '';
   let total;
-  if (manual !== '') total = parseFloat(manual) || 0;
+  if (temManual) total = moedaParaNumero(manualStr);
   else if (soma > 0) total = soma;
   else total = val * 0.05;
   // Só avisa se há valores distribuídos E a soma não bate com o total
@@ -1245,7 +1279,7 @@ function coletarRecebedores() {
   const out = [];
   document.querySelectorAll('#recebedores-list .recebedor-row').forEach(row => {
     const nome = row.querySelector('.recebedor-nome').value.trim();
-    const valor = parseFloat(row.querySelector('.recebedor-valor').value) || 0;
+    const valor = moedaParaNumero(row.querySelector('.recebedor-valor').value);
     if (nome) out.push({ nome, valor });
   });
   return out;
@@ -1286,7 +1320,7 @@ function coletarRecebedoresModal() {
   const out = [];
   document.querySelectorAll('#m-recebedores-list .recebedor-row-m').forEach(row => {
     const nome = row.querySelector('.recebedor-nome').value.trim();
-    const valor = parseFloat(row.querySelector('.recebedor-valor').value) || 0;
+    const valor = moedaParaNumero(row.querySelector('.recebedor-valor').value);
     if (nome) out.push({ nome, valor });
   });
   return out;
@@ -1336,15 +1370,15 @@ async function salvarEmissao() {
     datavoo,
     plataforma: document.getElementById('f-plataforma').value,
     usuarioMilhas: document.getElementById('f-usuario-milhas').value.trim(),
-    custoMilhas: parseFloat(document.getElementById('f-custo-milhas').value) || 0,
-    valor: parseFloat(document.getElementById('f-valor').value) || 0,
-    valorSite: parseFloat(document.getElementById('f-valor-site').value) || 0,
+    custoMilhas: moedaParaNumero(document.getElementById('f-custo-milhas').value),
+    valor: moedaParaNumero(document.getElementById('f-valor').value),
+    valorSite: moedaParaNumero(document.getElementById('f-valor-site').value),
     economia: calcEconomiaVal(),
     driveLink: window._driveLink || '',
     driveFileName: window._driveFileName || '',
     incentivoManual: (function(){
-      const m = document.getElementById('f-incentivo-manual').value;
-      if (m !== '') return parseFloat(m) || 0;
+      const mStr = document.getElementById('f-incentivo-manual').value;
+      if (mStr.replace(/\D/g,'') !== '') return moedaParaNumero(mStr);
       const soma = recebedoresSoma(serializarRecebedores(coletarRecebedores()));
       return soma > 0 ? soma : null;
     })(),
@@ -1698,10 +1732,10 @@ function openEditModal(id) {
   document.getElementById('m-data-volta').value = e.dataVolta || '';
   document.getElementById('m-plataforma').value = e.plataforma || '';
   document.getElementById('m-usuario-milhas').value = e.usuarioMilhas || '';
-  document.getElementById('m-custo').value = e.custoMilhas || '';
-  document.getElementById('m-valor').value = e.valor || '';
-  document.getElementById('m-valor-site').value = e.valorSite || '';
-  document.getElementById('m-incentivo').value = e.incentivoManual !== null && e.incentivoManual !== undefined ? e.incentivoManual : '';
+  setMoeda('m-custo', e.custoMilhas);
+  setMoeda('m-valor', e.valor);
+  setMoeda('m-valor-site', e.valorSite);
+  setMoeda('m-incentivo', (e.incentivoManual !== null && e.incentivoManual !== undefined) ? e.incentivoManual : '');
   document.getElementById('m-quem-reserva').value = e.quemReserva || '';
   document.getElementById('m-status-reserva').value = e.statusReserva || 'Pendente';
   popularRecebedoresModal(e.quemIncentivo);
@@ -1740,16 +1774,17 @@ function salvarEdicao() {
   e.datavoo = fmtDataVoo(dataIda, dataVolta, tipoVoo === 'idavolta' ? 'idavolta' : 'ida');
   e.plataforma = document.getElementById('m-plataforma').value;
   e.usuarioMilhas = document.getElementById('m-usuario-milhas').value.trim();
-  e.custoMilhas = parseFloat(document.getElementById('m-custo').value) || 0;
-  e.valor = parseFloat(document.getElementById('m-valor').value) || 0;
-  e.valorSite = parseFloat(document.getElementById('m-valor-site').value) || 0;
+  e.custoMilhas = moedaParaNumero(document.getElementById('m-custo').value);
+  e.valor = moedaParaNumero(document.getElementById('m-valor').value);
+  e.valorSite = moedaParaNumero(document.getElementById('m-valor-site').value);
   e.economia = e.valorSite - e.valor;
-  const incManual = document.getElementById('m-incentivo').value;
+  const incManualStr = document.getElementById('m-incentivo').value;
+  const temIncManual = incManualStr.replace(/\D/g,'') !== '';
   e.quemReserva = document.getElementById('m-quem-reserva').value.trim();
   e.statusReserva = document.getElementById('m-status-reserva').value;
   e.quemIncentivo = serializarRecebedores(coletarRecebedoresModal());
-  if (incManual !== '') {
-    e.incentivoManual = parseFloat(incManual) || 0;
+  if (temIncManual) {
+    e.incentivoManual = moedaParaNumero(incManualStr);
   } else {
     const soma = recebedoresSoma(e.quemIncentivo);
     e.incentivoManual = soma > 0 ? soma : null;
