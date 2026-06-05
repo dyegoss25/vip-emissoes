@@ -1086,6 +1086,25 @@ function setMoeda(id, valor) {
   if (valor === '' || valor === null || valor === undefined) { el.value = ''; return; }
   el.value = numeroParaMoeda(valor);
 }
+// Normaliza uma data para o formato YYYY-MM-DD aceito por <input type="date">.
+// Aceita "2026-06-02", "2026-06-02T03:00:00.000Z", Date, etc.
+function dataParaInput(valor) {
+  if (!valor) return '';
+  let s = String(valor).trim();
+  // Se vier com "T" (ISO com hora), pega só a parte da data
+  if (s.includes('T')) s = s.split('T')[0];
+  // Se já está YYYY-MM-DD, retorna
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Tenta interpretar como data
+  const d = new Date(valor);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dia = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dia;
+  }
+  return '';
+}
 
 function fmtData(d) {
   if (!d) return '—';
@@ -1727,9 +1746,9 @@ function openEditModal(id) {
   document.getElementById('m-qtd').value = e.qtd || 1;
   document.getElementById('m-origem').value = e.origem || '';
   document.getElementById('m-destino').value = e.destino || '';
-  document.getElementById('m-emissao').value = e.emissao || '';
-  document.getElementById('m-data-ida').value = e.dataIda || '';
-  document.getElementById('m-data-volta').value = e.dataVolta || '';
+  document.getElementById('m-emissao').value = dataParaInput(e.emissao);
+  document.getElementById('m-data-ida').value = dataParaInput(e.dataIda);
+  document.getElementById('m-data-volta').value = dataParaInput(e.dataVolta);
   document.getElementById('m-plataforma').value = e.plataforma || '';
   document.getElementById('m-usuario-milhas').value = e.usuarioMilhas || '';
   setMoeda('m-custo', e.custoMilhas);
