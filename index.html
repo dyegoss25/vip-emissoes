@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VIP · Controle de Emissões</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -526,8 +527,9 @@ tbody tr:hover { background: var(--surface2); }
     </nav>
     <div style="padding:12px 24px;border-top:1px solid var(--border);margin-top:auto;">
       <div id="sync-status" style="font-size:0.72rem;color:#888;margin-bottom:10px;display:flex;align-items:center;gap:5px;">⏳ <span>Carregando...</span></div>
-      <button class="btn-ghost" style="width:100%;font-size:0.75rem;" onclick="syncManual()">↺ Sincronizar</button>
-
+      <button class="btn-ghost" style="width:100%;font-size:0.75rem;margin-bottom:8px;" onclick="syncManual()">↺ Sincronizar</button>
+      <div id="drive-status" style="font-size:0.7rem;color:#888;margin-bottom:6px;display:flex;align-items:center;gap:5px;">☁ <span>Drive desconectado</span></div>
+      <button id="btn-drive" class="btn-ghost" style="width:100%;font-size:0.75rem;" onclick="conectarDrive()">🔗 Conectar Google Drive</button>
     </div>
     <div class="sidebar-bottom" style="border-top:none;padding-top:0;">2026 · VIP Universal Tour</div>
   </aside>
@@ -749,19 +751,20 @@ tbody tr:hover { background: var(--surface2); }
             </div>
           </div>
 
-          <!-- ANEXO PDF -->
+          <!-- ANEXO PDF (múltiplos) -->
           <div class="form-group form-full">
-            <label class="form-label">Anexar Reserva (PDF)</label>
+            <label class="form-label">Anexar Reservas / Bilhetes (PDF)</label>
             <div id="upload-area" onclick="document.getElementById('f-pdf').click()"
               style="border:1.5px dashed var(--border);border-radius:8px;padding:16px 20px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color 0.15s;"
               onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
               <span style="font-size:1.4rem;">📎</span>
               <div>
-                <div id="upload-label" style="font-size:0.82rem;color:var(--text-2);">Clique para selecionar o PDF da reserva</div>
-                <div style="font-size:0.68rem;color:var(--text-3);margin-top:2px;">O arquivo será salvo no Google Drive na pasta do mês do voo</div>
+                <div id="upload-label" style="font-size:0.82rem;color:var(--text-2);">Clique para selecionar um ou vários PDFs</div>
+                <div style="font-size:0.68rem;color:var(--text-3);margin-top:2px;">Os arquivos serão salvos no Google Drive na pasta do mês do voo (conecte o Drive antes)</div>
               </div>
             </div>
-            <input type="file" id="f-pdf" accept="application/pdf" style="display:none;" onchange="onPdfSelected()" />
+            <input type="file" id="f-pdf" accept="application/pdf" multiple style="display:none;" onchange="onPdfSelected()" />
+            <div id="f-anexos-list" style="margin-top:10px;display:flex;flex-direction:column;gap:6px;"></div>
           </div>
           <div id="upload-status" style="display:none;" class="form-full">
             <div style="background:var(--accent-dim);border:1px solid rgba(200,241,53,0.2);border-radius:8px;padding:10px 16px;font-size:0.78rem;display:flex;align-items:center;gap:10px;">
@@ -1503,17 +1506,84 @@ const DRIVE_FOLDERS = {
   12: '1xsV6kdRIORo_hPzGsqTWpyHM4gn7MESv',
 };
 
+// ---- AUTENTICAÇÃO GOOGLE DRIVE (OAuth) ----
+const DRIVE_CLIENT_ID = '119031150158-3imp6fb78q4q4g4a441ih3o38nl5ig8g.apps.googleusercontent.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
+window._driveToken = '';
+let _driveTokenClient = null;
+
+function initDriveClient() {
+  if (_driveTokenClient) return;
+  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
+  _driveTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: DRIVE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: (resp) => {
+      if (resp && resp.access_token) {
+        window._driveToken = resp.access_token;
+        updateDriveStatus(true);
+        showToast('✓ Google Drive conectado!');
+        // expira em ~1h: agenda aviso
+        if (resp.expires_in) {
+          setTimeout(() => { window._driveToken = ''; updateDriveStatus(false); }, (resp.expires_in - 60) * 1000);
+        }
+      }
+    },
+  });
+}
+
+function conectarDrive() {
+  initDriveClient();
+  if (!_driveTokenClient) {
+    showToast('⚠ Aguarde a biblioteca do Google carregar e tente de novo.');
+    return;
+  }
+  _driveTokenClient.requestAccessToken({ prompt: window._driveToken ? '' : 'consent' });
+}
+
+function updateDriveStatus(conectado) {
+  const st = document.getElementById('drive-status');
+  const btn = document.getElementById('btn-drive');
+  if (conectado) {
+    if (st) st.innerHTML = '☁ <span style="color:var(--success);">Drive conectado ✓</span>';
+    if (btn) btn.textContent = '🔗 Reconectar Drive';
+  } else {
+    if (st) st.innerHTML = '☁ <span>Drive desconectado</span>';
+    if (btn) btn.textContent = '🔗 Conectar Google Drive';
+  }
+}
+
 window._driveLink = '';
 window._driveFileName = '';
 
+// Lista de anexos selecionados/enviados do formulário: [{nome, link, file}]
+window._anexos = [];
+
 function onPdfSelected() {
-  const file = document.getElementById('f-pdf').files[0];
-  if (!file) return;
-  window._driveFileName = file.name;
-  document.getElementById('upload-label').textContent = '📄 ' + file.name;
-  document.getElementById('upload-status').style.display = 'block';
-  document.getElementById('upload-icon').textContent = '⏳';
-  document.getElementById('upload-msg').textContent = 'PDF selecionado. Será enviado ao Drive ao salvar a emissão.';
+  const input = document.getElementById('f-pdf');
+  const files = Array.from(input.files || []);
+  files.forEach(f => {
+    window._anexos.push({ nome: f.name, link: '', file: f });
+  });
+  input.value = ''; // permite selecionar os mesmos de novo se precisar
+  renderAnexosForm();
+}
+
+function renderAnexosForm() {
+  const cont = document.getElementById('f-anexos-list');
+  if (!cont) return;
+  cont.innerHTML = window._anexos.map((a, i) => `
+    <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:6px;padding:6px 10px;font-size:0.78rem;">
+      <span>📄</span>
+      <span style="flex:1;color:var(--text);">${a.nome}</span>
+      ${a.link ? '<span style="color:var(--success);font-size:0.7rem;">enviado ✓</span>' : '<span style="color:var(--text-3);font-size:0.7rem;">pendente</span>'}
+      <button type="button" class="btn-ghost" style="padding:2px 8px;flex:0 0 auto;" onclick="removerAnexoForm(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removerAnexoForm(i) {
+  window._anexos.splice(i, 1);
+  renderAnexosForm();
 }
 
 async function uploadPdfToDrive(file, dataIda) {
@@ -1530,23 +1600,31 @@ async function uploadPdfToDrive(file, dataIda) {
       reader.onload = async (e) => {
         const base64 = e.target.result.split(',')[1];
         try {
-          const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          const boundary = '-------VIPUpload' + Date.now();
+          const meta = JSON.stringify({ name: file.name, parents: [folderId] });
+          const body =
+            '--' + boundary + '\r\n' +
+            'Content-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n' +
+            '--' + boundary + '\r\n' +
+            'Content-Type: application/pdf\r\n' +
+            'Content-Transfer-Encoding: base64\r\n\r\n' + base64 + '\r\n' +
+            '--' + boundary + '--';
+          const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
             method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + window._driveToken },
-            body: (() => {
-              const meta = JSON.stringify({ name: file.name, parents: [folderId] });
-              const boundary = '-------VIPUpload';
-              const body = '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + meta +
-                '\r\n--' + boundary + '\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: base64\r\n\r\n' + base64 +
-                '\r\n--' + boundary + '--';
-              return body;
-            })(),
+            headers: {
+              'Authorization': 'Bearer ' + window._driveToken,
+              'Content-Type': 'multipart/related; boundary=' + boundary,
+            },
+            body: body,
           });
           if (resp.ok) {
             const data = await resp.json();
             resolve('https://drive.google.com/file/d/' + data.id + '/view');
-          } else { resolve(''); }
-        } catch { resolve(''); }
+          } else {
+            console.error('Upload falhou:', resp.status, await resp.text());
+            resolve('');
+          }
+        } catch (err) { console.error('Erro upload:', err); resolve(''); }
       };
       reader.readAsDataURL(file);
     });
@@ -1670,23 +1748,32 @@ async function salvarEmissao() {
   const pax = document.getElementById('f-pax').value.trim();
   if (!pax) { showToast('Informe o passageiro ou grupo!'); return; }
 
-  // Upload PDF se houver
-  const pdfFile = document.getElementById('f-pdf').files[0];
-  if (pdfFile) {
-    document.getElementById('upload-icon').textContent = '⏳';
-    document.getElementById('upload-msg').textContent = 'Enviando para o Google Drive...';
-    document.getElementById('upload-status').style.display = 'block';
-    const dataIda = document.getElementById('f-data-ida').value;
-    const link = await uploadPdfToDrive(pdfFile, dataIda);
-    window._driveLink = link;
-    if (link) {
-      document.getElementById('upload-icon').textContent = '✓';
-      document.getElementById('upload-msg').textContent = 'PDF salvo no Drive!';
-    } else {
-      document.getElementById('upload-icon').textContent = '⚠';
-      document.getElementById('upload-msg').textContent = 'Não foi possível enviar automaticamente. Salve manualmente no Drive.';
+  // Upload de PDFs (vários) se houver
+  const dataIdaUp = document.getElementById('f-data-ida').value;
+  if (window._anexos.length > 0) {
+    if (!window._driveToken) {
+      showToast('⚠ Conecte o Google Drive antes (botão na barra lateral).');
+      return;
     }
+    document.getElementById('upload-status').style.display = 'block';
+    for (let i = 0; i < window._anexos.length; i++) {
+      const a = window._anexos[i];
+      if (a.link) continue; // já enviado
+      document.getElementById('upload-icon').textContent = '⏳';
+      document.getElementById('upload-msg').textContent = `Enviando ${i+1}/${window._anexos.length}: ${a.nome}...`;
+      const link = await uploadPdfToDrive(a.file, dataIdaUp);
+      a.link = link || '';
+    }
+    const enviados = window._anexos.filter(a => a.link).length;
+    const falhas = window._anexos.length - enviados;
+    document.getElementById('upload-icon').textContent = falhas ? '⚠' : '✓';
+    document.getElementById('upload-msg').textContent = falhas
+      ? `${enviados} enviado(s), ${falhas} falharam. Verifique a conexão do Drive.`
+      : `${enviados} PDF(s) salvos no Drive!`;
+    renderAnexosForm();
   }
+  // Monta lista final de anexos enviados
+  const anexosSalvos = window._anexos.filter(a => a.link).map(a => ({ nome: a.nome, link: a.link }));
 
   const tipoVoo = document.querySelector('input[name="tipo-voo"]:checked').value;
   const dataIda = document.getElementById('f-data-ida').value;
@@ -1712,8 +1799,8 @@ async function salvarEmissao() {
     valor: moedaParaNumero(document.getElementById('f-valor').value),
     valorSite: moedaParaNumero(document.getElementById('f-valor-site').value),
     economia: calcEconomiaVal(),
-    driveLink: window._driveLink || '',
-    driveFileName: window._driveFileName || '',
+    driveLink: anexosSalvos.length ? JSON.stringify(anexosSalvos) : '',
+    driveFileName: anexosSalvos.length ? anexosSalvos.map(a=>a.nome).join(' | ') : '',
     incentivoManual: (function(){
       const mStr = document.getElementById('f-incentivo-manual').value;
       if (mStr.replace(/\D/g,'') !== '') return moedaParaNumero(mStr);
@@ -1794,8 +1881,10 @@ function limparForm() {
   document.getElementById('grupo-data-volta').style.display = 'none';
   document.getElementById('grupo-data-volta-placeholder').style.display = 'block';
   document.getElementById('f-pdf').value = '';
-  document.getElementById('upload-label').textContent = 'Clique para selecionar o PDF da reserva';
+  document.getElementById('upload-label').textContent = 'Clique para selecionar um ou vários PDFs';
   document.getElementById('upload-status').style.display = 'none';
+  window._anexos = [];
+  renderAnexosForm();
   document.getElementById('economia-calc').textContent = 'R$ 0,00';
   document.getElementById('recebedores-list').innerHTML = '';
   addRecebedor();
@@ -2133,6 +2222,30 @@ function renderCreditos() {
 }
 
 // ---- TABELA COMPLETA ----
+// Lê anexos do campo driveLink: aceita JSON [{nome,link}] (novo) ou link único (antigo)
+function parseAnexos(driveLink) {
+  if (!driveLink) return [];
+  const s = String(driveLink).trim();
+  if (s.startsWith('[')) {
+    try { const arr = JSON.parse(s); return Array.isArray(arr) ? arr : []; } catch { return []; }
+  }
+  // link único antigo
+  if (s.startsWith('http')) return [{ nome: 'Bilhete', link: s }];
+  return [];
+}
+
+// Renderiza a célula de PDF na tabela (vários botões "Abrir")
+function renderAnexosCell(driveLink) {
+  const anexos = parseAnexos(driveLink);
+  if (anexos.length === 0) return '<span style="color:var(--text-3);font-size:0.7rem">—</span>';
+  if (anexos.length === 1) {
+    return `<a href="${anexos[0].link}" target="_blank" style="color:var(--accent);font-size:0.72rem;text-decoration:none;">📄 Ver</a>`;
+  }
+  return anexos.map((a, i) =>
+    `<a href="${a.link}" target="_blank" title="${(a.nome||'').replace(/"/g,'&quot;')}" style="color:var(--accent);font-size:0.72rem;text-decoration:none;display:block;">📄 ${i+1}</a>`
+  ).join('');
+}
+
 function renderTabela() {
   const search = (document.getElementById('search-input')?.value || '').toLowerCase();
   const filterCia = document.getElementById('filter-cia')?.value || '';
@@ -2163,7 +2276,7 @@ function renderTabela() {
       <td style="font-size:0.72rem;color:var(--text-2)">${recebedoresTexto(e.quemIncentivo) || '—'}</td>
       <td>${tagStatus(e.statusIncentivo)}</td>
       <td style="font-size:0.7rem;color:var(--text-3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.obs || ''}</td>
-      <td>${e.driveLink ? '<a href="'+e.driveLink+'" target="_blank" style="color:var(--accent);font-size:0.72rem;text-decoration:none;">📄 Ver</a>' : '<span style="color:var(--text-3);font-size:0.7rem">—</span>'}</td>
+      <td>${renderAnexosCell(e.driveLink)}</td>
       <td style="white-space:nowrap;">
         <button class="act-btn" onclick="openEditModal(${e.id})" title="Editar emissão">✎</button>
         <button class="act-btn" onclick="confirmarExcluir(${e.id})" title="Excluir" style="color:var(--danger)">✕</button>
