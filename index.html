@@ -754,7 +754,7 @@ tbody tr:hover { background: var(--surface2); }
           <!-- ANEXO PDF (múltiplos) -->
           <div class="form-group form-full">
             <label class="form-label">Anexar Reservas / Bilhetes (PDF)</label>
-            <div id="upload-area" onclick="document.getElementById('f-pdf').click()"
+            <div id="upload-area" onclick="abrirSeletorPdf()"
               style="border:1.5px dashed var(--border);border-radius:8px;padding:16px 20px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color 0.15s;"
               onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
               <span style="font-size:1.4rem;">📎</span>
@@ -1571,6 +1571,7 @@ function conectarDrive() {
 // Ao abrir o sistema: se já autorizou antes, reconecta sozinho (silencioso)
 function autoReconectarDrive() {
   if (localStorage.getItem('vip_drive_autorizado') !== '1') return;
+  updateDriveStatus(false); // mostra "Drive pronto (conecta ao anexar)"
   let tentativas = 0;
   const tentar = () => {
     initDriveClient();
@@ -1583,9 +1584,13 @@ function autoReconectarDrive() {
 function updateDriveStatus(conectado) {
   const st = document.getElementById('drive-status');
   const btn = document.getElementById('btn-drive');
+  const jaAutorizou = localStorage.getItem('vip_drive_autorizado') === '1';
   if (conectado) {
     if (st) st.innerHTML = '☁ <span style="color:var(--success);">Drive conectado ✓</span>';
     if (btn) btn.textContent = '🔗 Reconectar Drive';
+  } else if (jaAutorizou) {
+    if (st) st.innerHTML = '☁ <span style="color:var(--text-2);">Drive pronto (conecta ao anexar)</span>';
+    if (btn) btn.textContent = '🔗 Conectar agora';
   } else {
     if (st) st.innerHTML = '☁ <span>Drive desconectado</span>';
     if (btn) btn.textContent = '🔗 Conectar Google Drive';
@@ -1597,6 +1602,19 @@ window._driveFileName = '';
 
 // Lista de anexos selecionados/enviados do formulário: [{nome, link, file}]
 window._anexos = [];
+
+// Ao clicar para anexar: aproveita o clique (permitido pelo navegador) para
+// conectar/renovar o Drive em silêncio, e abre o seletor de arquivos.
+function abrirSeletorPdf() {
+  // Se já autorizou antes e não tem token válido, renova agora (clique do usuário libera)
+  if (!window._driveToken && localStorage.getItem('vip_drive_autorizado') === '1') {
+    renovarTokenSilencioso();
+  } else if (!window._driveToken && localStorage.getItem('vip_drive_autorizado') !== '1') {
+    // Nunca conectou: pede conexão agora (mostra a tela uma vez)
+    conectarDrive();
+  }
+  document.getElementById('f-pdf').click();
+}
 
 function onPdfSelected() {
   const input = document.getElementById('f-pdf');
