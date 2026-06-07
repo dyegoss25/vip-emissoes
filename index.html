@@ -553,6 +553,15 @@ tbody tr:hover { background: var(--surface2); }
         <div id="list-proximos" style="margin-top:8px;"></div>
       </div>
 
+      <!-- CRÉDITOS DE CANCELAMENTO -->
+      <div class="pend-card" style="margin-bottom:24px;border-color:var(--danger-dim);">
+        <div class="pend-card-header">
+          <span class="pend-card-title" style="color:var(--danger)">⊘ Créditos de cancelamento (por pagador)</span>
+          <span class="badge-count" id="badge-creditos">0</span>
+        </div>
+        <div id="list-creditos" style="margin-top:8px;"></div>
+      </div>
+
       <div class="charts-grid" id="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
         <div class="pend-card" style="grid-column:1 / -1;">
           <div class="pend-card-header">
@@ -852,6 +861,8 @@ tbody tr:hover { background: var(--surface2); }
           <option value="">Status reserva</option>
           <option value="Pendente">Pendente</option>
           <option value="Pago">Pago</option>
+          <option value="N/A">Não tem</option>
+          <option value="Cancelada">Cancelada</option>
         </select>
         <select class="filter-select" id="filter-incentivo" onchange="renderTabela()">
           <option value="">Status incentivo</option>
@@ -1904,6 +1915,7 @@ function renderDashboard() {
   renderChartPagante();
   renderChartPlataforma();
   renderProximosVoos();
+  renderCreditos();
 
   // listas pendências
   document.getElementById('badge-reserva').textContent = pendReserva.length;
@@ -2070,6 +2082,54 @@ function renderProximosVoos() {
         </div>
       </div>`;
   }).join('');
+}
+
+// Créditos de cancelamento agrupados por pagador
+function renderCreditos() {
+  const cont = document.getElementById('list-creditos');
+  const badge = document.getElementById('badge-creditos');
+  if (!cont) return;
+  // Considera emissões canceladas que geraram crédito
+  const comCredito = emissoes.filter(e =>
+    e.statusReserva === 'Cancelada' &&
+    e.cancelGerouCredito === 'Sim' &&
+    Number(e.cancelValorCredito) > 0
+  );
+  // Agrupa por pagador do crédito (ou quem pagou a reserva, se não informado)
+  const grupos = {};
+  let totalGeral = 0;
+  comCredito.forEach(e => {
+    const nome = (e.cancelPagador || e.quemReserva || '—').trim() || '—';
+    const val = Number(e.cancelValorCredito) || 0;
+    if (!grupos[nome]) grupos[nome] = { valor: 0, itens: [] };
+    grupos[nome].valor += val;
+    grupos[nome].itens.push(e);
+    totalGeral += val;
+  });
+  const nomes = Object.keys(grupos).sort((a, b) => grupos[b].valor - grupos[a].valor);
+  if (badge) badge.textContent = comCredito.length;
+  if (nomes.length === 0) {
+    cont.innerHTML = '<div class="empty-state">Nenhum crédito de cancelamento registrado</div>';
+    return;
+  }
+  let html = `<div style="margin-bottom:12px;padding:10px 12px;background:var(--danger-dim);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:var(--text);font-weight:600;">Total em créditos a recuperar</span>
+    <span style="color:var(--danger);font-weight:700;font-size:1.05rem;">${fmtBRL(totalGeral)}</span>
+  </div>`;
+  html += nomes.map(n => {
+    const detalhes = grupos[n].itens.map(e =>
+      `<div style="color:var(--text-3);font-size:0.72rem;padding-left:4px;">• ${e.loc || '—'} · ${e.cia || ''} · ${fmtBRL(e.cancelValorCredito)} ${e.cancelSolicitante ? '· solic.: '+e.cancelSolicitante : ''}</div>`
+    ).join('');
+    return `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:var(--text);font-weight:600;">${n} <span style="color:var(--text-3);font-weight:400;font-size:0.74rem;">(${grupos[n].itens.length})</span></span>
+          <span style="color:var(--danger);font-weight:600;">${fmtBRL(grupos[n].valor)}</span>
+        </div>
+        ${detalhes}
+      </div>`;
+  }).join('');
+  cont.innerHTML = html;
 }
 
 // ---- TABELA COMPLETA ----
