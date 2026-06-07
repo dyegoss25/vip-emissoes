@@ -1511,6 +1511,8 @@ const DRIVE_CLIENT_ID = '119031150158-3imp6fb78q4q4g4a441ih3o38nl5ig8g.apps.goog
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 window._driveToken = '';
 let _driveTokenClient = null;
+let _driveTokenExpiry = 0;
+let _driveRenewTimer = null;
 
 function initDriveClient() {
   if (_driveTokenClient) return;
@@ -1520,16 +1522,40 @@ function initDriveClient() {
     scope: DRIVE_SCOPE,
     callback: (resp) => {
       if (resp && resp.access_token) {
+        const primeiraVez = localStorage.getItem('vip_drive_autorizado') !== '1';
         window._driveToken = resp.access_token;
+        const segundos = resp.expires_in || 3600;
+        _driveTokenExpiry = Date.now() + segundos * 1000;
+        localStorage.setItem('vip_drive_autorizado', '1');
         updateDriveStatus(true);
-        showToast('✓ Google Drive conectado!');
-        // expira em ~1h: agenda aviso
-        if (resp.expires_in) {
-          setTimeout(() => { window._driveToken = ''; updateDriveStatus(false); }, (resp.expires_in - 60) * 1000);
-        }
+        if (primeiraVez) showToast('✓ Google Drive conectado!');
+        // Renova sozinho ~2 min antes de expirar (silencioso, sem tela)
+        if (_driveRenewTimer) clearTimeout(_driveRenewTimer);
+        _driveRenewTimer = setTimeout(renovarTokenSilencioso, Math.max((segundos - 120) * 1000, 10000));
       }
     },
+    error_callback: () => {}
   });
+}
+
+// Renova o token SEM mostrar tela (só funciona se já autorizou antes)
+function renovarTokenSilencioso() {
+  initDriveClient();
+  if (!_driveTokenClient) return;
+  try { _driveTokenClient.requestAccessToken({ prompt: '' }); } catch(e) {}
+}
+
+// Garante token válido antes de usar (renova em silêncio se preciso)
+async function garantirDriveToken() {
+  if (window._driveToken && Date.now() < _driveTokenExpiry - 30000) return true;
+  if (localStorage.getItem('vip_drive_autorizado') === '1') {
+    renovarTokenSilencioso();
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 200));
+      if (window._driveToken && Date.now() < _driveTokenExpiry - 30000) return true;
+    }
+  }
+  return !!window._driveToken;
 }
 
 function conectarDrive() {
@@ -1538,7 +1564,20 @@ function conectarDrive() {
     showToast('⚠ Aguarde a biblioteca do Google carregar e tente de novo.');
     return;
   }
-  _driveTokenClient.requestAccessToken({ prompt: window._driveToken ? '' : 'consent' });
+  const jaAutorizou = localStorage.getItem('vip_drive_autorizado') === '1';
+  _driveTokenClient.requestAccessToken({ prompt: jaAutorizou ? '' : 'consent' });
+}
+
+// Ao abrir o sistema: se já autorizou antes, reconecta sozinho (silencioso)
+function autoReconectarDrive() {
+  if (localStorage.getItem('vip_drive_autorizado') !== '1') return;
+  let tentativas = 0;
+  const tentar = () => {
+    initDriveClient();
+    if (_driveTokenClient) { renovarTokenSilencioso(); return; }
+    if (++tentativas < 25) setTimeout(tentar, 200);
+  };
+  tentar();
 }
 
 function updateDriveStatus(conectado) {
@@ -1751,8 +1790,9 @@ async function salvarEmissao() {
   // Upload de PDFs (vários) se houver
   const dataIdaUp = document.getElementById('f-data-ida').value;
   if (window._anexos.length > 0) {
-    if (!window._driveToken) {
-      showToast('⚠ Conecte o Google Drive antes (botão na barra lateral).');
+    const temToken = await garantirDriveToken();
+    if (!temToken) {
+      showToast('⚠ Conecte o Google Drive (botão na barra lateral) e salve de novo.');
       return;
     }
     document.getElementById('upload-status').style.display = 'block';
@@ -2491,6 +2531,7 @@ async function init() {
   }
   renderPessoasUI();
   renderDashboard();
+  autoReconectarDrive(); // reconecta o Drive sozinho se já autorizou antes
 }
 
 function updateSyncStatus(status) {
