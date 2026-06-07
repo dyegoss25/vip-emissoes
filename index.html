@@ -768,10 +768,11 @@ tbody tr:hover { background: var(--surface2); }
           </div>
           <div class="form-group">
             <label class="form-label">Status Reserva</label>
-            <select class="form-select" id="f-status-reserva">
+            <select class="form-select" id="f-status-reserva" onchange="toggleCancelForm()">
               <option value="Pendente">Pendente</option>
               <option value="Pago">Pago</option>
               <option value="N/A">Não tem</option>
+              <option value="Cancelada">Cancelada</option>
             </select>
           </div>
           <div class="form-group form-full">
@@ -798,6 +799,35 @@ tbody tr:hover { background: var(--surface2); }
             <input class="form-input" id="f-obs" placeholder="Informações adicionais..." />
           </div>
         </div>
+
+        <!-- SEÇÃO CANCELAMENTO (aparece só se Status Reserva = Cancelada) -->
+        <div id="f-cancel-box" style="display:none;margin-top:18px;padding:16px;border:1px solid var(--danger-dim);border-radius:12px;background:var(--danger-dim);">
+          <div style="color:var(--danger);font-weight:600;margin-bottom:14px;">⊘ Dados do Cancelamento</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Quem Solicitou o Cancelamento</label>
+              <input class="form-input" id="f-cancel-solicitante" list="datalist-pagadores" placeholder="Nome de quem pediu..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gerou Crédito?</label>
+              <select class="form-select" id="f-cancel-credito" onchange="toggleCancelForm()">
+                <option value="">Selecione...</option>
+                <option value="Sim">Sim, gerou crédito</option>
+                <option value="Não">Não gerou crédito</option>
+                <option value="Aguardando">Aguardando definição</option>
+              </select>
+            </div>
+            <div class="form-group" id="f-cancel-valor-group">
+              <label class="form-label">Valor do Crédito (R$)</label>
+              <input class="form-input" id="f-cancel-valor" type="text" inputmode="numeric" placeholder="0,00" oninput="mascararMoeda(this)" />
+            </div>
+            <div class="form-group" id="f-cancel-pagador-group">
+              <label class="form-label">Crédito para qual Pagador</label>
+              <input class="form-input" id="f-cancel-pagador" list="datalist-pagadores" placeholder="Pagador que tem o crédito..." />
+            </div>
+          </div>
+        </div>
+
         <div class="form-actions">
           <button class="btn" onclick="salvarEmissao()">✓ Salvar Emissão</button>
           <button class="btn-ghost" onclick="limparForm()">Limpar</button>
@@ -1020,10 +1050,11 @@ tbody tr:hover { background: var(--surface2); }
       </div>
       <div class="form-group">
         <label class="form-label">Status Reserva</label>
-        <select class="form-select" id="m-status-reserva">
+        <select class="form-select" id="m-status-reserva" onchange="toggleCancelModal()">
           <option value="Pendente">Pendente</option>
           <option value="Pago">Pago</option>
           <option value="N/A">Não tem</option>
+          <option value="Cancelada">Cancelada</option>
         </select>
       </div>
       <div class="form-group form-full">
@@ -1043,6 +1074,35 @@ tbody tr:hover { background: var(--surface2); }
       <div class="form-group" style="grid-column:1/-1;">
         <label class="form-label">Observações</label>
         <input class="form-input" id="m-obs" />
+      </div>
+      <!-- SEÇÃO CANCELAMENTO (modal) -->
+      <div class="form-group" style="grid-column:1/-1;">
+        <div id="m-cancel-box" style="display:none;padding:16px;border:1px solid var(--danger-dim);border-radius:12px;background:var(--danger-dim);">
+          <div style="color:var(--danger);font-weight:600;margin-bottom:14px;">⊘ Dados do Cancelamento</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Quem Solicitou o Cancelamento</label>
+              <input class="form-input" id="m-cancel-solicitante" list="datalist-pagadores" placeholder="Nome de quem pediu..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gerou Crédito?</label>
+              <select class="form-select" id="m-cancel-credito" onchange="toggleCancelModal()">
+                <option value="">Selecione...</option>
+                <option value="Sim">Sim, gerou crédito</option>
+                <option value="Não">Não gerou crédito</option>
+                <option value="Aguardando">Aguardando definição</option>
+              </select>
+            </div>
+            <div class="form-group" id="m-cancel-valor-group">
+              <label class="form-label">Valor do Crédito (R$)</label>
+              <input class="form-input" id="m-cancel-valor" type="text" inputmode="numeric" placeholder="0,00" oninput="mascararMoeda(this)" />
+            </div>
+            <div class="form-group" id="m-cancel-pagador-group">
+              <label class="form-label">Crédito para qual Pagador</label>
+              <input class="form-input" id="m-cancel-pagador" list="datalist-pagadores" placeholder="Pagador que tem o crédito..." />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-actions">
@@ -1072,7 +1132,7 @@ tbody tr:hover { background: var(--surface2); }
 // ---- CONFIG ----
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPAuWkBILsE5R_ZzEmKUZMXzHCwOgSc6QygMEaC4dnw6bAUWme7kX5lB_WpK5wZb39/exec';
 const BACKUP_KEY = 'vip_emissoes_backup';
-const HEADERS = ['ID','Localizador','Cia','Passageiro','Qtd','Origem','Destino','Emissao','TipoVoo','DataIda','DataVolta','DataVoo','Plataforma','UsuarioMilhas','CustoEmissao','ValorTotal','ValorSite','Economia','Incentivo','IncentivoManual','QuemReserva','StatusReserva','QuemIncentivo','StatusIncentivo','DriveLink','DriveFileName','Obs'];
+const HEADERS = ['ID','Localizador','Cia','Passageiro','Qtd','Origem','Destino','Emissao','TipoVoo','DataIda','DataVolta','DataVoo','Plataforma','UsuarioMilhas','CustoEmissao','ValorTotal','ValorSite','Economia','Incentivo','IncentivoManual','QuemReserva','StatusReserva','QuemIncentivo','StatusIncentivo','DriveLink','DriveFileName','Obs','CancelSolicitante','CancelGerouCredito','CancelValorCredito','CancelPagador'];
 
 let emissoes = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
 let editingId = null;
@@ -1128,7 +1188,10 @@ function emissaoToRow(e) {
     incentivo(e), e.incentivoManual !== null && e.incentivoManual !== undefined ? e.incentivoManual : '',
     e.quemReserva, e.statusReserva,
     e.quemIncentivo, e.statusIncentivo,
-    e.driveLink, e.driveFileName, e.obs
+    e.driveLink, e.driveFileName, e.obs,
+    e.cancelSolicitante || '', e.cancelGerouCredito || '',
+    (e.cancelValorCredito !== null && e.cancelValorCredito !== undefined && e.cancelValorCredito !== '') ? e.cancelValorCredito : '',
+    e.cancelPagador || ''
   ];
 }
 
@@ -1143,7 +1206,10 @@ function rowToEmissao(r) {
     incentivoManual: (r[19] !== '' && r[19] !== undefined && r[19] !== null) ? Number(r[19]) : null,
     quemReserva: r[20] || '', statusReserva: r[21] || 'Pendente',
     quemIncentivo: r[22] || '', statusIncentivo: r[23] || 'Pendente',
-    driveLink: r[24] || '', driveFileName: r[25] || '', obs: r[26] || ''
+    driveLink: r[24] || '', driveFileName: r[25] || '', obs: r[26] || '',
+    cancelSolicitante: r[27] || '', cancelGerouCredito: r[28] || '',
+    cancelValorCredito: (r[29] !== '' && r[29] !== undefined && r[29] !== null) ? Number(r[29]) : null,
+    cancelPagador: r[30] || ''
   };
 }
 
@@ -1269,6 +1335,33 @@ function showView(name) {
 // ---- FORMAT ----
 function fmtBRL(v) {
   return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Mostra/esconde a seção de cancelamento no formulário de Nova Emissão
+function toggleCancelForm() {
+  const status = document.getElementById('f-status-reserva').value;
+  const box = document.getElementById('f-cancel-box');
+  if (box) box.style.display = (status === 'Cancelada') ? 'block' : 'none';
+  // Valor e pagador do crédito só aparecem se gerou crédito = Sim
+  const credito = document.getElementById('f-cancel-credito');
+  const mostrarValor = credito && credito.value === 'Sim';
+  const vg = document.getElementById('f-cancel-valor-group');
+  const pg = document.getElementById('f-cancel-pagador-group');
+  if (vg) vg.style.display = mostrarValor ? 'block' : 'none';
+  if (pg) pg.style.display = mostrarValor ? 'block' : 'none';
+}
+
+// Mostra/esconde a seção de cancelamento no modal de edição
+function toggleCancelModal() {
+  const status = document.getElementById('m-status-reserva').value;
+  const box = document.getElementById('m-cancel-box');
+  if (box) box.style.display = (status === 'Cancelada') ? 'block' : 'none';
+  const credito = document.getElementById('m-cancel-credito');
+  const mostrarValor = credito && credito.value === 'Sim';
+  const vg = document.getElementById('m-cancel-valor-group');
+  const pg = document.getElementById('m-cancel-pagador-group');
+  if (vg) vg.style.display = mostrarValor ? 'block' : 'none';
+  if (pg) pg.style.display = mostrarValor ? 'block' : 'none';
 }
 
 // ---- MÁSCARA DE MOEDA (entrada em centavos, estilo maquininha) ----
@@ -1621,10 +1714,19 @@ async function salvarEmissao() {
     quemIncentivo: serializarRecebedores(coletarRecebedores()),
     statusIncentivo: document.getElementById('f-status-incentivo').value,
     obs: document.getElementById('f-obs').value.trim(),
+    cancelSolicitante: document.getElementById('f-status-reserva').value === 'Cancelada' ? document.getElementById('f-cancel-solicitante').value.trim() : '',
+    cancelGerouCredito: document.getElementById('f-status-reserva').value === 'Cancelada' ? document.getElementById('f-cancel-credito').value : '',
+    cancelValorCredito: (document.getElementById('f-status-reserva').value === 'Cancelada' && document.getElementById('f-cancel-credito').value === 'Sim') ? moedaParaNumero(document.getElementById('f-cancel-valor').value) : null,
+    cancelPagador: (document.getElementById('f-status-reserva').value === 'Cancelada' && document.getElementById('f-cancel-credito').value === 'Sim') ? document.getElementById('f-cancel-pagador').value.trim() : '',
   };
 
   emissoes.unshift(emissao);
   saveBackup(); // salva local imediatamente
+  // Antes de limpar o form, captura nomes para checar se são novos
+  const nomesParaChecar = {
+    pagador: emissao.quemReserva,
+    recebedores: coletarRecebedores().map(r => r.nome).filter(Boolean)
+  };
   limparForm();
   showToast('⏳ Salvando...');
   const ok = await appendToSheet(emissao);
@@ -1634,6 +1736,37 @@ async function salvarEmissao() {
     showToast('⚠ Salvo localmente. Sincronize quando conectar.');
   }
   renderDashboard();
+  // Pergunta se quer adicionar nomes novos às listas de Pessoas
+  await checarNomesNovos(nomesParaChecar);
+}
+
+// Verifica se pagador/recebedores são novos e pergunta se quer cadastrar
+async function checarNomesNovos({ pagador, recebedores }) {
+  let mudou = false;
+  // Pagador
+  if (pagador && !pessoasPagadores.some(n => n.toLowerCase() === pagador.toLowerCase())) {
+    if (confirm(`"${pagador}" não está na sua lista de pagadores.\n\nDeseja adicionar à lista para usar nas próximas emissões?`)) {
+      pessoasPagadores.push(pagador);
+      pessoasPagadores.sort((a,b) => a.localeCompare(b, 'pt-BR'));
+      mudou = true;
+    }
+  }
+  // Recebedores
+  (recebedores || []).forEach(nome => {
+    if (nome && !pessoasRecebedores.some(n => n.toLowerCase() === nome.toLowerCase())) {
+      if (confirm(`"${nome}" não está na sua lista de recebedores de incentivo.\n\nDeseja adicionar à lista?`)) {
+        pessoasRecebedores.push(nome);
+        pessoasRecebedores.sort((a,b) => a.localeCompare(b, 'pt-BR'));
+        mudou = true;
+      }
+    }
+  });
+  if (mudou) {
+    savePessoasBackup();
+    atualizarDatalists();
+    await rewriteSheet();
+    showToast('✓ Lista de pessoas atualizada!');
+  }
 }
 
 function limparForm() {
@@ -1658,7 +1791,12 @@ function limparForm() {
   window._driveLink = '';
   window._driveFileName = '';
   document.getElementById('grupo-usuario-milhas').style.display = 'none';
-
+  // limpa campos de cancelamento
+  ['f-cancel-solicitante','f-cancel-valor','f-cancel-pagador'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const fcc = document.getElementById('f-cancel-credito'); if (fcc) fcc.value = '';
+  toggleCancelForm();
 }
 
 function toggleTipoVoo() {
@@ -2046,6 +2184,12 @@ function openEditModal(id) {
   popularRecebedoresModal(e.quemIncentivo);
   document.getElementById('m-status-incentivo').value = e.statusIncentivo || 'Pendente';
   document.getElementById('m-obs').value = e.obs || '';
+  // Cancelamento
+  document.getElementById('m-cancel-solicitante').value = e.cancelSolicitante || '';
+  document.getElementById('m-cancel-credito').value = e.cancelGerouCredito || '';
+  setMoeda('m-cancel-valor', (e.cancelValorCredito !== null && e.cancelValorCredito !== undefined) ? e.cancelValorCredito : '');
+  document.getElementById('m-cancel-pagador').value = e.cancelPagador || '';
+  toggleCancelModal();
   toggleMilhasModal();
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -2098,13 +2242,25 @@ function salvarEdicao() {
   }
   e.statusIncentivo = document.getElementById('m-status-incentivo').value;
   e.obs = document.getElementById('m-obs').value.trim();
+  // Cancelamento
+  const ehCancelada = document.getElementById('m-status-reserva').value === 'Cancelada';
+  const mCredito = document.getElementById('m-cancel-credito').value;
+  e.cancelSolicitante = ehCancelada ? document.getElementById('m-cancel-solicitante').value.trim() : '';
+  e.cancelGerouCredito = ehCancelada ? mCredito : '';
+  e.cancelValorCredito = (ehCancelada && mCredito === 'Sim') ? moedaParaNumero(document.getElementById('m-cancel-valor').value) : null;
+  e.cancelPagador = (ehCancelada && mCredito === 'Sim') ? document.getElementById('m-cancel-pagador').value.trim() : '';
   saveBackup();
+  const nomesParaChecar = {
+    pagador: e.quemReserva,
+    recebedores: coletarRecebedoresModal().map(r => r.nome).filter(Boolean)
+  };
   closeModal();
   renderTabela();
   showToast('⏳ Atualizando...');
   rewriteSheet().then(ok => {
     showToast(ok ? '✓ Atualizado no Google Sheets!' : '⚠ Salvo localmente.');
     renderDashboard();
+    checarNomesNovos(nomesParaChecar);
   });
 }
 
