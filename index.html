@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VIP · Controle de Emissões</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#060D1F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vip Tour Corporate">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -866,6 +874,7 @@ tbody tr:hover { background: var(--surface2); }
           <option value="Pago">Pago</option>
           <option value="N/A">Não tem</option>
           <option value="Cancelada">Cancelada</option>
+          <option value="__INCOMPLETA__">⚠ Incompletas</option>
         </select>
         <select class="filter-select" id="filter-incentivo" onchange="renderTabela()">
           <option value="">Status incentivo</option>
@@ -2304,6 +2313,31 @@ function renderAnexosCell(driveLink) {
   ).join('');
 }
 
+// Uma emissão é "incompleta" se falta algum dado essencial.
+// Serve para o lançamento rápido: você joga nome + custo na correria e completa depois.
+function emissaoIncompleta(e) {
+  // Cancelada nunca é "incompleta" (é um estado final, não falta preencher)
+  if (e.statusReserva === 'Cancelada') return false;
+  const semLoc = !e.loc || e.loc === '—' || e.loc === '';
+  const semCia = !e.cia || e.cia === '';
+  const semValor = !(Number(e.valor) > 0);
+  const semCusto = !(Number(e.custoMilhas) > 0);
+  const semDataIda = !e.dataIda;
+  // Considera incompleta se faltar 1 ou mais essenciais
+  return semLoc || semCia || semValor || semCusto || semDataIda;
+}
+
+// Lista o que falta (para mostrar na etiqueta como dica)
+function faltasEmissao(e) {
+  const f = [];
+  if (!e.loc || e.loc === '—' || e.loc === '') f.push('localizador');
+  if (!e.cia || e.cia === '') f.push('cia');
+  if (!(Number(e.valor) > 0)) f.push('valor');
+  if (!(Number(e.custoMilhas) > 0)) f.push('custo');
+  if (!e.dataIda) f.push('data');
+  return f;
+}
+
 function renderTabela() {
   const search = (document.getElementById('search-input')?.value || '').toLowerCase();
   const filterCia = document.getElementById('filter-cia')?.value || '';
@@ -2312,17 +2346,24 @@ function renderTabela() {
 
   let data = emissoes.filter(e => {
     const txt = [e.loc, e.pax, e.origem, e.destino, e.cia, e.quemReserva, recebedoresTexto(e.quemIncentivo), e.obs].join(' ').toLowerCase();
+    const passaReserva = filterR === '__INCOMPLETA__' ? emissaoIncompleta(e) : (!filterR || e.statusReserva === filterR);
     return (!search || txt.includes(search))
       && (!filterCia || e.cia === filterCia)
-      && (!filterR || e.statusReserva === filterR)
+      && passaReserva
       && (!filterI || e.statusIncentivo === filterI);
   });
 
-  document.getElementById('tbody-all').innerHTML = data.map(e => `
-    <tr>
+  document.getElementById('tbody-all').innerHTML = data.map(e => {
+    const inc = emissaoIncompleta(e);
+    const faltas = inc ? faltasEmissao(e) : [];
+    const etiqueta = inc
+      ? `<span title="Falta: ${faltas.join(', ')}" style="display:inline-block;margin-left:6px;background:rgba(245,158,11,0.18);color:var(--warning);font-size:0.6rem;font-weight:600;padding:1px 6px;border-radius:8px;vertical-align:middle;white-space:nowrap;">⚠ Incompleta</span>`
+      : '';
+    return `
+    <tr${inc ? ' style="background:rgba(245,158,11,0.05);"' : ''}>
       <td class="loc">${e.loc}</td>
       <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
-      <td>${e.pax}</td>
+      <td>${e.pax}${etiqueta}</td>
       <td style="text-align:center">${e.qtd}</td>
       <td class="rota">${e.origem} → ${e.destino}</td>
       <td style="color:var(--text-2);font-size:0.72rem">${e.emissao || '—'}</td>
@@ -2339,7 +2380,7 @@ function renderTabela() {
         <button class="act-btn" onclick="openEditModal(${e.id})" title="Editar emissão">✎</button>
         <button class="act-btn" onclick="confirmarExcluir(${e.id})" title="Excluir" style="color:var(--danger)">✕</button>
       </td>
-    </tr>`).join('') || '<tr><td colspan="15" style="text-align:center;color:var(--text-3);padding:24px">Nenhum resultado</td></tr>';
+    </tr>`; }).join('') || '<tr><td colspan="15" style="text-align:center;color:var(--text-3);padding:24px">Nenhum resultado</td></tr>';
 }
 
 // ---- PENDÊNCIAS ----
@@ -2586,6 +2627,13 @@ async function syncManual() {
 
 
 init();
+
+// Registra o service worker (PWA: ícone, abrir offline)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
