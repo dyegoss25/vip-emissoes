@@ -509,6 +509,46 @@ tbody tr:hover { background: var(--surface2); }
 </head>
 <body>
 
+<!-- ===== TELA DE LOGIN (senha de acesso) ===== -->
+<div id="login-screen" style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:370px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.25rem;letter-spacing:0.05em;color:var(--accent);line-height:1.1;">VIP Universal Tour</div>
+    <div style="font-size:0.7rem;color:var(--text-2);letter-spacing:0.08em;text-transform:uppercase;margin-top:5px;margin-bottom:26px;">Controle de Emissoes</div>
+
+    <!-- Passo 1: digitar senha -->
+    <div id="login-step-senha">
+      <div style="font-size:0.82rem;color:var(--text-2);margin-bottom:18px;">&#128274; Acesso restrito. Digite a senha:</div>
+      <input type="password" id="login-input" placeholder="Senha" autocomplete="current-password"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-size:0.95rem;font-family:'DM Sans',sans-serif;outline:none;text-align:center;letter-spacing:0.1em;margin-bottom:14px;"
+        onkeydown="if(event.key==='Enter')fazerLogin()" />
+      <div id="login-erro" style="display:none;color:var(--danger);font-size:0.78rem;margin-bottom:14px;">Senha incorreta. Tente novamente.</div>
+      <button onclick="fazerLogin()"
+        style="width:100%;background:var(--accent);color:#0E0F11;border:none;border-radius:8px;padding:12px;font-size:0.9rem;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;letter-spacing:0.03em;">
+        Entrar
+      </button>
+    </div>
+
+    <!-- Passo 2: criar nova senha (primeiro acesso) -->
+    <div id="login-step-nova" style="display:none;">
+      <div style="font-size:0.82rem;color:var(--accent);margin-bottom:6px;font-weight:600;">&#128273; Primeiro acesso</div>
+      <div style="font-size:0.78rem;color:var(--text-2);margin-bottom:18px;">Crie uma senha pessoal para este aparelho. Ela fica salva so aqui, ninguem mais ve.</div>
+      <input type="password" id="login-nova1" placeholder="Nova senha (min. 4 caracteres)" autocomplete="new-password"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-size:0.95rem;font-family:'DM Sans',sans-serif;outline:none;text-align:center;margin-bottom:12px;" />
+      <input type="password" id="login-nova2" placeholder="Repita a nova senha" autocomplete="new-password"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-size:0.95rem;font-family:'DM Sans',sans-serif;outline:none;text-align:center;margin-bottom:14px;"
+        onkeydown="if(event.key==='Enter')criarNovaSenha()" />
+      <div id="login-nova-erro" style="display:none;color:var(--danger);font-size:0.78rem;margin-bottom:14px;"></div>
+      <button onclick="criarNovaSenha()"
+        style="width:100%;background:var(--accent);color:#0E0F11;border:none;border-radius:8px;padding:12px;font-size:0.9rem;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;letter-spacing:0.03em;">
+        Salvar e entrar
+      </button>
+    </div>
+
+    <div style="margin-top:20px;font-size:0.68rem;color:var(--text-3);">VIP Universal Tour &middot; 2026</div>
+  </div>
+</div>
+
+
 <div class="app">
   <!-- SIDEBAR -->
   <aside class="sidebar">
@@ -2624,6 +2664,160 @@ async function syncManual() {
   }
 }
 
+
+
+
+// ===== CONTROLE DE ACESSO (senha + timeout de inatividade) =====
+// A senha padrao so serve para o 1o acesso; o sistema obriga trocar.
+// A senha real fica salva LOCALMENTE neste aparelho (nao no codigo).
+const SENHA_PADRAO = 'vip2026';
+const SENHA_KEY = 'vip_senha_hash';
+const SESSAO_KEY = 'vip_sessao_ok';
+const TIMEOUT_MIN = 30; // minutos de inatividade na WEB (no celular/app nao trava)
+let _inatividadeTimer = null;
+
+// Hash simples (nao e criptografia forte, mas evita senha em texto puro no aparelho)
+function _hashSenha(s) {
+  let h = 0;
+  const str = 'vip$' + s + '$tour';
+  for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+  return String(h);
+}
+
+// Detecta se esta rodando como APP instalado (PWA) ou na WEB (navegador)
+function _ehApp() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+}
+
+// Mostra o sistema (esconde login) e liga o que precisa
+function _liberarSistema() {
+  document.getElementById('login-screen').style.display = 'none';
+  sessionStorage.setItem(SESSAO_KEY, '1');
+  // Login dispara reconexao silenciosa do Drive (se ja autorizou antes neste aparelho)
+  try { autoReconectarDrive(); } catch(e) {}
+  // So a WEB tem timeout por inatividade
+  if (!_ehApp()) {
+    _ligarTimeoutInatividade();
+  }
+}
+
+function fazerLogin() {
+  const inp = document.getElementById('login-input');
+  const erro = document.getElementById('login-erro');
+  const val = (inp.value || '');
+  const salva = localStorage.getItem(SENHA_KEY);
+
+  if (!salva) {
+    // Nunca criou senha: so aceita a padrao e ai obriga a trocar
+    if (val === SENHA_PADRAO) {
+      _mostrarPassoNovaSenha();
+      return;
+    }
+    erro.style.display = 'block';
+    inp.value = '';
+    return;
+  }
+  // Ja tem senha pessoal salva
+  if (_hashSenha(val) === salva) {
+    erro.style.display = 'none';
+    inp.value = '';
+    _liberarSistema();
+  } else {
+    erro.style.display = 'block';
+    inp.value = '';
+  }
+}
+
+function _mostrarPassoNovaSenha() {
+  document.getElementById('login-step-senha').style.display = 'none';
+  document.getElementById('login-step-nova').style.display = 'block';
+  setTimeout(() => { const e = document.getElementById('login-nova1'); if (e) e.focus(); }, 50);
+}
+
+function criarNovaSenha() {
+  const n1 = document.getElementById('login-nova1').value || '';
+  const n2 = document.getElementById('login-nova2').value || '';
+  const erro = document.getElementById('login-nova-erro');
+  if (n1.length < 4) {
+    erro.textContent = 'A senha precisa ter pelo menos 4 caracteres.';
+    erro.style.display = 'block';
+    return;
+  }
+  if (n1 !== n2) {
+    erro.textContent = 'As duas senhas nao sao iguais. Tente de novo.';
+    erro.style.display = 'block';
+    return;
+  }
+  if (n1 === SENHA_PADRAO) {
+    erro.textContent = 'Escolha uma senha diferente da provisoria.';
+    erro.style.display = 'block';
+    return;
+  }
+  localStorage.setItem(SENHA_KEY, _hashSenha(n1));
+  erro.style.display = 'none';
+  showToast('\u2713 Senha criada! Acesso liberado.');
+  _liberarSistema();
+}
+
+// ----- Timeout por inatividade (somente WEB) -----
+function _ligarTimeoutInatividade() {
+  const reset = () => {
+    if (_inatividadeTimer) clearTimeout(_inatividadeTimer);
+    _inatividadeTimer = setTimeout(_travarPorInatividade, TIMEOUT_MIN * 60 * 1000);
+  };
+  ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(ev => {
+    document.addEventListener(ev, reset, { passive: true });
+  });
+  reset();
+}
+
+function _travarPorInatividade() {
+  sessionStorage.removeItem(SESSAO_KEY);
+  // Reseta a tela de login para o passo de senha e mostra
+  document.getElementById('login-step-nova').style.display = 'none';
+  document.getElementById('login-step-senha').style.display = 'block';
+  const inp = document.getElementById('login-input');
+  if (inp) inp.value = '';
+  document.getElementById('login-erro').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  if (inp) setTimeout(() => inp.focus(), 100);
+}
+
+// ----- Decide na abertura se mostra login ou ja libera -----
+function iniciarControleAcesso() {
+  const temSenha = !!localStorage.getItem(SENHA_KEY);
+  const sessaoAtiva = sessionStorage.getItem(SESSAO_KEY) === '1';
+  const app = _ehApp();
+
+  // No APP: se ja criou senha e ja entrou alguma vez neste aparelho, mantem conectado
+  if (app && temSenha && localStorage.getItem('vip_app_logado') === '1') {
+    document.getElementById('login-screen').style.display = 'none';
+    try { autoReconectarDrive(); } catch(e) {}
+    return;
+  }
+  // Sessao ainda ativa (mesma aba aberta): nao pede de novo
+  if (sessaoAtiva && temSenha) {
+    document.getElementById('login-screen').style.display = 'none';
+    if (!app) _ligarTimeoutInatividade();
+    return;
+  }
+  // Caso contrario: mostra a tela de login
+  document.getElementById('login-screen').style.display = 'flex';
+  const inp = document.getElementById('login-input');
+  if (inp) setTimeout(() => inp.focus(), 150);
+}
+
+// Marca o app como logado para manter conectado entre aberturas
+(function(){
+  const orig = _liberarSistema;
+  _liberarSistema = function() {
+    orig();
+    if (_ehApp()) localStorage.setItem('vip_app_logado', '1');
+  };
+})();
+
+iniciarControleAcesso();
 
 
 init();
