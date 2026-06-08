@@ -959,26 +959,50 @@ tbody tr:hover { background: var(--surface2); }
         <div class="page-desc">Reservas a receber e incentivos a pagar</div>
       </div>
 
-      <!-- ===== FILTRO POR PESSOA ===== -->
-      <div class="table-wrap" style="padding:16px 18px;margin-bottom:22px;">
+      <!-- ===== CONTAS A RECEBER (filtro por pagador) ===== -->
+      <div class="table-wrap" style="padding:16px 18px;margin-bottom:18px;border-left:3px solid var(--warning);">
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
           <div style="flex:1;min-width:200px;">
-            <label class="form-label" style="display:block;margin-bottom:6px;">Filtrar por pessoa</label>
-            <input class="form-input" id="filtro-pessoa" list="datalist-todas-pessoas" placeholder="Digite ou escolha um nome..." oninput="renderPorPessoa()" />
-            <datalist id="datalist-todas-pessoas"></datalist>
+            <label class="form-label" style="display:block;margin-bottom:6px;color:var(--warning);">Reservas a Receber — por Pagador</label>
+            <select class="form-select" id="filtro-receber-pessoa" onchange="renderContasReceber()">
+              <option value="">Selecione um pagador...</option>
+            </select>
           </div>
           <div style="min-width:170px;">
             <label class="form-label" style="display:block;margin-bottom:6px;">Status</label>
-            <select class="form-select" id="filtro-pessoa-status" onchange="renderPorPessoa()">
+            <select class="form-select" id="filtro-receber-status" onchange="renderContasReceber()">
               <option value="Pendente">Apenas pendentes</option>
               <option value="">Todas</option>
               <option value="Pago">Apenas pagas</option>
               <option value="Cancelada">Apenas canceladas</option>
             </select>
           </div>
-          <button class="btn-ghost" style="padding:10px 16px;" onclick="limparFiltroPessoa()">Limpar</button>
+          <button class="btn-ghost" style="padding:10px 16px;" onclick="document.getElementById('filtro-receber-pessoa').value='';renderContasReceber();">Limpar</button>
         </div>
-        <div id="resultado-pessoa" style="margin-top:18px;"></div>
+        <div id="resultado-receber" style="margin-top:18px;"></div>
+      </div>
+
+      <!-- ===== CONTAS A PAGAR (filtro por recebedor) ===== -->
+      <div class="table-wrap" style="padding:16px 18px;margin-bottom:22px;border-left:3px solid var(--danger);">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+          <div style="flex:1;min-width:200px;">
+            <label class="form-label" style="display:block;margin-bottom:6px;color:var(--danger);">Incentivos / Comissões a Repassar — por Recebedor</label>
+            <select class="form-select" id="filtro-pagar-pessoa" onchange="renderContasPagar()">
+              <option value="">Selecione um recebedor...</option>
+            </select>
+          </div>
+          <div style="min-width:170px;">
+            <label class="form-label" style="display:block;margin-bottom:6px;">Status</label>
+            <select class="form-select" id="filtro-pagar-status" onchange="renderContasPagar()">
+              <option value="Pendente">Apenas pendentes</option>
+              <option value="">Todas</option>
+              <option value="Pago">Apenas pagas</option>
+              <option value="Cancelada">Apenas canceladas</option>
+            </select>
+          </div>
+          <button class="btn-ghost" style="padding:10px 16px;" onclick="document.getElementById('filtro-pagar-pessoa').value='';renderContasPagar();">Limpar</button>
+        </div>
+        <div id="resultado-pagar" style="margin-top:18px;"></div>
       </div>
 
       <div style="margin-bottom:20px;">
@@ -2475,118 +2499,69 @@ function renderPendencias() {
       <td style="font-size:0.72rem">${recebedoresTexto(e.quemIncentivo) || '—'}</td>
       <td><button class="btn" style="padding:5px 12px;font-size:0.7rem" onclick="marcarPago(${e.id},'incentivo')">Marcar Pago</button></td>
     </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:20px">Nenhuma pendência ✓</td></tr>';
-  atualizarDatalistTodasPessoas();
-  renderPorPessoa();
+  popularFiltrosContas();
+  renderContasReceber();
+  renderContasPagar();
 }
 
-// ===== CENTRAL POR PESSOA (quem me deve / quem eu devo) =====
-// Atualiza a lista suspensa com TODOS os nomes (pagadores + recebedores + usados em emissoes)
-// Deixa a primeira letra de cada palavra maiúscula (ex: "pablo" -> "Pablo")
-function _nomeBonito(s) {
-  return (s || '').trim().toLowerCase().replace(/(^|\s)([a-záàâãéèêíïóôõöúçñ])/g, (m, sep, letra) => sep + letra.toUpperCase());
-}
-
-function atualizarDatalistTodasPessoas() {
-  const dl = document.getElementById('datalist-todas-pessoas');
-  if (!dl) return;
-  // Agrupa nomes pela versão normalizada (ignora maiúscula/acento/espaço),
-  // mostrando só UMA versão bonita de cada pessoa na lista suspensa.
-  const mapa = {}; // chave normalizada -> nome bonito
-  const addNome = (n) => {
-    if (!n || !n.trim()) return;
-    const chave = _normNome(n);
-    if (!mapa[chave]) mapa[chave] = _nomeBonito(n);
-  };
-  pessoasPagadores.forEach(addNome);
-  pessoasRecebedores.forEach(addNome);
-  emissoes.forEach(e => {
-    addNome(e.quemReserva);
-    parseRecebedores(e.quemIncentivo).forEach(r => addNome(r.nome));
-  });
-  const ordenados = Object.values(mapa).sort((a,b) => a.localeCompare(b,'pt-BR'));
-  dl.innerHTML = ordenados.map(n => `<option value="${n.replace(/"/g,'&quot;')}"></option>`).join('');
-}
-
-function limparFiltroPessoa() {
-  const inp = document.getElementById('filtro-pessoa');
-  if (inp) inp.value = '';
-  renderPorPessoa();
-}
-
+// ===== CONTAS A RECEBER / A PAGAR (dois filtros separados, ligados ao cadastro de Pessoas) =====
 // Compara nomes ignorando maiúsculas/acentos/espaços extras
 function _normNome(s) {
   return (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-function renderPorPessoa() {
-  const inp = document.getElementById('filtro-pessoa');
-  const cont = document.getElementById('resultado-pessoa');
+// Preenche os dois seletores: Receber usa SÓ pessoasPagadores; Pagar usa SÓ pessoasRecebedores.
+function popularFiltrosContas() {
+  const selReceber = document.getElementById('filtro-receber-pessoa');
+  const selPagar = document.getElementById('filtro-pagar-pessoa');
+  if (selReceber) {
+    const atual = selReceber.value;
+    const ordenados = pessoasPagadores.slice().sort((a,b) => a.localeCompare(b,'pt-BR'));
+    selReceber.innerHTML = '<option value="">Selecione um pagador...</option>' +
+      ordenados.map(n => `<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`).join('');
+    if (atual) selReceber.value = atual;
+  }
+  if (selPagar) {
+    const atual = selPagar.value;
+    const ordenados = pessoasRecebedores.slice().sort((a,b) => a.localeCompare(b,'pt-BR'));
+    selPagar.innerHTML = '<option value="">Selecione um recebedor...</option>' +
+      ordenados.map(n => `<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`).join('');
+    if (atual) selPagar.value = atual;
+  }
+}
+
+function _statusTag(s) {
+  if (s === 'Pago') return '<span class="tag tag-pago">Pago</span>';
+  if (s === 'Cancelada') return '<span class="tag tag-pendente" style="background:var(--danger-dim);color:var(--danger)">Cancelada</span>';
+  if (s === 'N/A') return '<span class="tag tag-ntem">N/A</span>';
+  return '<span class="tag tag-pendente">Pendente</span>';
+}
+
+// --- CONTAS A RECEBER: filtra reservas pelo pagador escolhido ---
+function renderContasReceber() {
+  const cont = document.getElementById('resultado-receber');
   if (!cont) return;
-  const nome = (inp ? inp.value : '').trim();
-  if (!nome) { cont.innerHTML = '<div class="empty-state">Escolha uma pessoa acima para ver o que ela te deve (reservas) e o que você deve a ela (incentivos).</div>'; return; }
+  const nome = document.getElementById('filtro-receber-pessoa').value;
+  if (!nome) { cont.innerHTML = '<div class="empty-state">Selecione um pagador para ver os valores a receber.</div>'; return; }
   const alvo = _normNome(nome);
-  const statusFiltro = document.getElementById('filtro-pessoa-status').value; // '', 'Pendente', 'Pago', 'Cancelada'
+  const statusFiltro = document.getElementById('filtro-receber-status').value;
 
-  // --- O que essa pessoa TE DEVE (reservas onde ela é a pagadora) ---
-  let meDeve = emissoes.filter(e => _normNome(e.quemReserva) === alvo);
-  if (statusFiltro) meDeve = meDeve.filter(e => e.statusReserva === statusFiltro);
+  let lista = emissoes.filter(e => _normNome(e.quemReserva) === alvo);
+  if (statusFiltro) lista = lista.filter(e => e.statusReserva === statusFiltro);
+  const total = lista.reduce((s, e) => s + (Number(e.valor) || 0), 0);
 
-  // --- O que VOCÊ DEVE a ela (incentivos onde ela é recebedora) ---
-  let euDevo = [];
-  emissoes.forEach(e => {
-    const recs = parseRecebedores(e.quemIncentivo);
-    const ehRecebedor = recs.some(r => _normNome(r.nome) === alvo);
-    if (!ehRecebedor) return;
-    if (statusFiltro && e.statusIncentivo !== statusFiltro) return;
-    // valor que cabe a essa pessoa especificamente
-    const meu = recs.find(r => _normNome(r.nome) === alvo);
-    const valorPessoa = (meu && Number(meu.valor) > 0) ? Number(meu.valor) : incentivo(e);
-    euDevo.push({ e, valorPessoa });
-  });
-
-  const totalMeDeve = meDeve.reduce((s, e) => s + (Number(e.valor) || 0), 0);
-  const totalEuDevo = euDevo.reduce((s, x) => s + x.valorPessoa, 0);
-  const saldo = totalMeDeve - totalEuDevo;
-
-  const statusTag = s => {
-    if (s === 'Pago') return '<span class="tag tag-pago">Pago</span>';
-    if (s === 'Cancelada') return '<span class="tag tag-pendente" style="background:var(--danger-dim);color:var(--danger)">Cancelada</span>';
-    if (s === 'N/A') return '<span class="tag tag-ntem">N/A</span>';
-    return '<span class="tag tag-pendente">Pendente</span>';
-  };
-
-  // Cabeçalho com resumo + saldo
-  const tituloStatus = statusFiltro === '' ? 'todas as movimentações' :
-    statusFiltro === 'Pendente' ? 'pendências em aberto' :
-    statusFiltro === 'Pago' ? 'movimentações já pagas' : 'movimentações canceladas';
-
-  let html = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;">
-      <div class="stat-card" style="border-color:var(--warning);">
-        <div class="stat-label">${nome} te deve</div>
-        <div class="stat-value warning">${fmtBRL(totalMeDeve)}</div>
-        <div class="stat-sub">${meDeve.length} reserva(s)</div>
-      </div>
-      <div class="stat-card" style="border-color:var(--danger);">
-        <div class="stat-label">Você deve a ${nome}</div>
-        <div class="stat-value danger">${fmtBRL(totalEuDevo)}</div>
-        <div class="stat-sub">${euDevo.length} incentivo(s)</div>
-      </div>
-      <div class="stat-card" style="border-color:${saldo >= 0 ? 'var(--success)' : 'var(--danger)'};">
-        <div class="stat-label">Saldo (${tituloStatus})</div>
-        <div class="stat-value ${saldo >= 0 ? 'success' : 'danger'}">${fmtBRL(Math.abs(saldo))}</div>
-        <div class="stat-sub">${saldo > 0 ? nome + ' fica te devendo' : saldo < 0 ? 'você fica devendo a ' + nome : 'tudo quitado entre vocês'}</div>
-      </div>
+  let html = `<div class="stat-card" style="border-color:var(--warning);margin-bottom:16px;">
+      <div class="stat-label">Total a receber de ${nome}</div>
+      <div class="stat-value warning">${fmtBRL(total)}</div>
+      <div class="stat-sub">${lista.length} lançamento(s)</div>
     </div>`;
 
-  // Tabela: o que me deve (reservas)
-  html += `<div class="section-title" style="margin-top:6px;">⚡ ${nome} te deve (reservas) <span class="badge-count">${meDeve.length}</span></div>`;
-  if (meDeve.length === 0) {
-    html += '<div class="empty-state" style="margin-bottom:18px;">Nada nesse filtro.</div>';
+  if (lista.length === 0) {
+    html += '<div class="empty-state">Nada nesse filtro.</div>';
   } else {
-    html += `<div class="table-wrap" style="margin-bottom:18px;"><div class="table-scroll"><table>
+    html += `<div class="table-wrap"><div class="table-scroll"><table>
       <thead><tr><th>Localizador</th><th>Cia</th><th>Passageiro</th><th>Rota</th><th>Data Voo</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead><tbody>`;
-    html += meDeve.map(e => `
+    html += lista.map(e => `
       <tr>
         <td class="loc">${e.loc}</td>
         <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
@@ -2594,34 +2569,59 @@ function renderPorPessoa() {
         <td class="rota">${e.origem} → ${e.destino}</td>
         <td style="color:var(--text-2);font-size:0.72rem">${fmtDataVoo(e.dataIda, e.dataVolta, e.tipoVoo)}</td>
         <td class="valor" style="color:var(--warning)">${fmtBRL(e.valor)}</td>
-        <td>${statusTag(e.statusReserva)}</td>
+        <td>${_statusTag(e.statusReserva)}</td>
         <td>${e.statusReserva === 'Pendente' ? `<button class="btn" style="padding:5px 12px;font-size:0.7rem" onclick="marcarPago(${e.id},'reserva')">Marcar Pago</button>` : '—'}</td>
       </tr>`).join('');
-    html += `<tr style="background:var(--surface2);font-weight:600;"><td colspan="5" style="text-align:right;">Total:</td><td class="valor" style="color:var(--warning)">${fmtBRL(totalMeDeve)}</td><td colspan="2"></td></tr>`;
+    html += `<tr style="background:var(--surface2);font-weight:600;"><td colspan="5" style="text-align:right;">Total:</td><td class="valor" style="color:var(--warning)">${fmtBRL(total)}</td><td colspan="2"></td></tr>`;
     html += `</tbody></table></div></div>`;
   }
+  cont.innerHTML = html;
+}
 
-  // Tabela: o que eu devo (incentivos)
-  html += `<div class="section-title">↩ Você deve a ${nome} (incentivos) <span class="badge-count">${euDevo.length}</span></div>`;
-  if (euDevo.length === 0) {
+// --- CONTAS A PAGAR: filtra incentivos pelo recebedor escolhido ---
+function renderContasPagar() {
+  const cont = document.getElementById('resultado-pagar');
+  if (!cont) return;
+  const nome = document.getElementById('filtro-pagar-pessoa').value;
+  if (!nome) { cont.innerHTML = '<div class="empty-state">Selecione um recebedor para ver os valores a pagar.</div>'; return; }
+  const alvo = _normNome(nome);
+  const statusFiltro = document.getElementById('filtro-pagar-status').value;
+
+  let lista = [];
+  emissoes.forEach(e => {
+    const recs = parseRecebedores(e.quemIncentivo);
+    const meu = recs.find(r => _normNome(r.nome) === alvo);
+    if (!meu) return;
+    if (statusFiltro && e.statusIncentivo !== statusFiltro) return;
+    const valorPessoa = (Number(meu.valor) > 0) ? Number(meu.valor) : incentivo(e);
+    lista.push({ e, valorPessoa });
+  });
+  const total = lista.reduce((s, x) => s + x.valorPessoa, 0);
+
+  let html = `<div class="stat-card" style="border-color:var(--danger);margin-bottom:16px;">
+      <div class="stat-label">Total a pagar para ${nome}</div>
+      <div class="stat-value danger">${fmtBRL(total)}</div>
+      <div class="stat-sub">${lista.length} lançamento(s)</div>
+    </div>`;
+
+  if (lista.length === 0) {
     html += '<div class="empty-state">Nada nesse filtro.</div>';
   } else {
     html += `<div class="table-wrap"><div class="table-scroll"><table>
       <thead><tr><th>Localizador</th><th>Cia</th><th>Passageiro</th><th>Rota</th><th>Valor p/ ${nome}</th><th>Status</th><th>Ação</th></tr></thead><tbody>`;
-    html += euDevo.map(({e, valorPessoa}) => `
+    html += lista.map(({e, valorPessoa}) => `
       <tr>
         <td class="loc">${e.loc}</td>
         <td><span class="cia-tag ${ciaClass(e.cia)}">${e.cia}</span></td>
         <td>${e.pax}${e.qtd > 1 ? ' ('+e.qtd+' pax)' : ''}</td>
         <td class="rota">${e.origem} → ${e.destino}</td>
         <td class="incentivo-val">${fmtBRL(valorPessoa)}</td>
-        <td>${statusTag(e.statusIncentivo)}</td>
+        <td>${_statusTag(e.statusIncentivo)}</td>
         <td>${e.statusIncentivo === 'Pendente' ? `<button class="btn" style="padding:5px 12px;font-size:0.7rem" onclick="marcarPago(${e.id},'incentivo')">Marcar Pago</button>` : '—'}</td>
       </tr>`).join('');
-    html += `<tr style="background:var(--surface2);font-weight:600;"><td colspan="4" style="text-align:right;">Total:</td><td class="incentivo-val">${fmtBRL(totalEuDevo)}</td><td colspan="2"></td></tr>`;
+    html += `<tr style="background:var(--surface2);font-weight:600;"><td colspan="4" style="text-align:right;">Total:</td><td class="incentivo-val">${fmtBRL(total)}</td><td colspan="2"></td></tr>`;
     html += `</tbody></table></div></div>`;
   }
-
   cont.innerHTML = html;
 }
 
@@ -2633,7 +2633,8 @@ function marcarPago(id, tipo) {
   saveBackup();
   renderPendencias();
   renderDashboard();
-  renderPorPessoa();
+  renderContasReceber();
+  renderContasPagar();
   showToast('⏳ Sincronizando...');
   rewriteSheet().then(ok => {
     showToast(ok ? '✓ Atualizado no Google Sheets!' : '⚠ Salvo localmente.');
